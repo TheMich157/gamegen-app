@@ -38,5 +38,22 @@ public partial class App : Application
         MainShell = window;
         window.NavigateShell();
         window.Activate();
+
+        // Silent background update check — result surfaces in Settings page
+        _ = CheckForUpdatesInBackgroundAsync();
+    }
+
+    private async Task CheckForUpdatesInBackgroundAsync()
+    {
+        try
+        {
+            var result = await Svcs.UpdateChecker.CheckAsync().ConfigureAwait(false);
+            if (result?.IsUpdateAvailable == true)
+                Svcs.StartupUpdateResult = result;
+        }
+        catch
+        {
+            // Best-effort only; never surface startup-check errors to the user
+        }
     }
 }

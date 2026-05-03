@@ -18,7 +18,10 @@
 
     mc:Ignorable="d">
 
-
+    <Page.KeyboardAccelerators>
+        <KeyboardAccelerator Key="F"  Modifiers="Control" Invoked="FocusSearch_Accelerator" />
+        <KeyboardAccelerator Key="F5" Invoked="Refresh_Accelerator" />
+    </Page.KeyboardAccelerators>
 
     <Grid Padding="{StaticResource ManifestInsetPadding}" RowSpacing="12">
 
@@ -596,6 +599,35 @@
                 </StackPanel>
 
 
+
+                <!-- Launch in Steam -->
+                <Button
+                    x:Name="LaunchSteamButton"
+                    MinWidth="140"
+                    Click="LaunchSteam_Click"
+                    Content="Launch in Steam"
+                    Visibility="Collapsed" />
+
+                <!-- Install progress feedback -->
+                <StackPanel x:Name="InstallProgressPanel" Spacing="6" Visibility="Collapsed">
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <ProgressRing
+                            x:Name="InstallProgressRing"
+                            Width="20" Height="20"
+                            IsActive="False"
+                            Visibility="Collapsed" />
+                        <ProgressBar
+                            x:Name="InstallProgressBar"
+                            Width="180"
+                            Maximum="100"
+                            Value="0"
+                            Visibility="Collapsed" />
+                    </StackPanel>
+                    <TextBlock
+                        x:Name="InstallProgressText"
+                        FontSize="12"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
 
                 <MenuFlyoutSeparator />
 

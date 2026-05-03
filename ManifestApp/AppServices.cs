@@ -47,4 +47,10 @@ internal sealed class AppServices
     internal DiscordPresenceService DiscordPresence { get; }
 
     internal UpdateService UpdateChecker { get; }
+
+    /// <summary>
+    /// Populated by the background startup update check in <see cref="App.OnLaunched"/>.
+    /// Non-null and <see cref="Services.UpdateResult.IsUpdateAvailable"/> only when an update was found.
+    /// </summary>
+    internal UpdateResult? StartupUpdateResult { get; set; }
 }

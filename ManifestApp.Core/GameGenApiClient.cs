@@ -11,7 +11,7 @@ namespace ManifestApp.Core;
 public sealed class GameGenApiClient(HttpClient http, SettingsStore settingsStore)
 {
     public async Task<GameGenZipResult> DownloadGenerateZipAsync(string apiKey, uint appId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, IProgress<double>? progress = null)
     {
         if (string.IsNullOrWhiteSpace(apiKey))
             return GameGenZipResult.Fail("GameGen API key is empty. Add it in Settings.");
@@ -45,7 +45,7 @@ public sealed class GameGenApiClient(HttpClient http, SettingsStore settingsStor
                         $"GameGen HTTP {(int)jsonResponse.StatusCode} — body was not recognizable JSON.");
                 }
 
-                return await TryZipQueryFallbackAsync(generateUrl, cancellationToken).ConfigureAwait(false);
+                return await TryZipQueryFallbackAsync(generateUrl, cancellationToken, progress).ConfigureAwait(false);
             }
 
             if (explicitFail)
@@ -69,7 +69,7 @@ public sealed class GameGenApiClient(HttpClient http, SettingsStore settingsStor
                 try
                 {
                     var resolved = AbsoluteUrl(generateUrl, dl!);
-                    var zipBytes = await DownloadBytesAsync(resolved, cancellationToken).ConfigureAwait(false);
+                    var zipBytes = await DownloadBytesAsync(resolved, cancellationToken, progress).ConfigureAwait(false);
                     return LooksLikeZip(zipBytes)
                         ? GameGenZipResult.Successful(zipBytes)
                         : GameGenZipResult.Fail("GameGen download URL did not return a ZIP archive.");
@@ -80,7 +80,7 @@ public sealed class GameGenApiClient(HttpClient http, SettingsStore settingsStor
                 }
             }
 
-            return await TryZipQueryFallbackAsync(generateUrl, cancellationToken).ConfigureAwait(false);
+            return await TryZipQueryFallbackAsync(generateUrl, cancellationToken, progress).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -89,7 +89,7 @@ public sealed class GameGenApiClient(HttpClient http, SettingsStore settingsStor
     }
 
     private async Task<GameGenZipResult> TryZipQueryFallbackAsync(string generateUrl,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, IProgress<double>? progress = null)
     {
         var zipUrl = $"{generateUrl}?format=zip";
         try
@@ -99,7 +99,8 @@ public sealed class GameGenApiClient(HttpClient http, SettingsStore settingsStor
                     .ConfigureAwait(false);
             using (rsp)
             {
-                var raw = await ReadBodyAsync(rsp.Content, cancellationToken).ConfigureAwait(false);
+                // Stream with progress for the fallback ZIP download
+                var raw = await StreamBodyAsync(rsp.Content, cancellationToken, progress).ConfigureAwait(false);
 
                 if (rsp.IsSuccessStatusCode && LooksLikeZip(raw))
                     return GameGenZipResult.Successful(raw);
@@ -193,14 +194,44 @@ public sealed class GameGenApiClient(HttpClient http, SettingsStore settingsStor
         return b;
     }
 
-    private async Task<byte[]> DownloadBytesAsync(Uri url, CancellationToken cancellationToken)
+    private async Task<byte[]> DownloadBytesAsync(Uri url, CancellationToken cancellationToken,
+        IProgress<double>? progress = null)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         using var response =
             await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
                 .ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
-        return await ReadBodyAsync(response.Content, cancellationToken).ConfigureAwait(false);
+        return await StreamBodyAsync(response.Content, cancellationToken, progress).ConfigureAwait(false);
+    }
+
+    /// <summary>Reads an HTTP body as a byte array, reporting download progress (0–100) when <paramref name="progress"/> is provided.</summary>
+    private static async Task<byte[]> StreamBodyAsync(HttpContent content, CancellationToken ct,
+        IProgress<double>? progress = null)
+    {
+        if (progress is null)
+        {
+            await using var ms0 = new MemoryStream();
+            await content.CopyToAsync(ms0, ct).ConfigureAwait(false);
+            return ms0.ToArray();
+        }
+
+        var total = content.Headers.ContentLength ?? -1L;
+        await using var src = await content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+        await using var ms  = new MemoryStream(total > 0 ? (int)Math.Min(total, 32 * 1024 * 1024) : 65536);
+
+        var buf        = new byte[81920];
+        long downloaded = 0;
+        int  read;
+        while ((read = await src.ReadAsync(buf, ct).ConfigureAwait(false)) > 0)
+        {
+            ms.Write(buf, 0, read);
+            downloaded += read;
+            if (total > 0)
+                progress.Report(downloaded * 100.0 / total);
+        }
+
+        return ms.ToArray();
     }
 
     private static Uri AbsoluteUrl(string generateUrl, string relativeOrAbsolute)

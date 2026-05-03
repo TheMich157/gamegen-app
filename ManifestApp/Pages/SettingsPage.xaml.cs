@@ -57,6 +57,19 @@ public sealed partial class SettingsPage : Page
             : "No API key saved yet. Paste below and tap save.";
 
         VersionText.Text = UpdateService.CurrentVersionString;
+
+        // If the background startup check already found an update, pre-populate the InfoBar
+        var startupResult = TypedApp.Svcs.StartupUpdateResult;
+        if (startupResult?.IsUpdateAvailable == true && !UpdateInfoBar.IsOpen)
+        {
+            _latestExeDownloadUrl = startupResult.ExeDownloadUrl;
+            UpdateInfoBar.Severity = InfoBarSeverity.Informational;
+            UpdateInfoBar.Title    = $"Update available — v{startupResult.LatestVersion.ToString(3)}";
+            UpdateInfoBar.Message  = $"You're on v{startupResult.CurrentVersion.ToString(3)}. Click Install to download and apply.";
+            UpdateInfoBar.IsOpen   = true;
+            if (_latestExeDownloadUrl is not null)
+                InstallUpdateButton.Visibility = Visibility.Visible;
+        }
     }
 
     private async void CheckUpdates_Click(object sender, RoutedEventArgs e)

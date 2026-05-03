@@ -156,6 +156,23 @@ public sealed partial class HomePage : Page
             return;
         }
 
+        // ── Direct App ID entry: numeric query skips store search ───────────
+        if (uint.TryParse(query, System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture, out var directId) && directId > 0)
+        {
+            var directVm = new GameRowVm(directId, $"Steam App {directId}");
+            HydrateTrackedState(directVm);
+            _ = FallbackCapsule184Async(directVm).ConfigureAwait(false);
+
+            GamesGrid.ItemsSource = new ObservableCollection<GameRowVm> { directVm };
+            GamesGrid.SelectedItem = directVm;
+
+            DetailTitle.Text = $"App ID {directId}";
+            DetailStatus.Text = "Direct App ID — install or remove manifests using the buttons below.";
+            SyncDiscordPresenceFromHome();
+            return;
+        }
+
         DetailTitle.Text = $"Searching Steam Store… \"{query}\"";
         TypedApp.Svcs.DiscordPresence.NotifySearchingStore(TruncateForDiscordPresence(query));
 
@@ -410,8 +427,10 @@ public sealed partial class HomePage : Page
         if (sel is null)
         {
             DetailTitle.Text = SelectGameTitleFallback();
-            InstallButton.IsEnabled = false;
-            RemoveButton.IsEnabled = false;
+            InstallButton.IsEnabled      = false;
+            RemoveButton.IsEnabled       = false;
+            LaunchSteamButton.Visibility = Visibility.Collapsed;
+            HideInstallProgress();
             return;
         }
 
@@ -448,8 +467,9 @@ public sealed partial class HomePage : Page
 
         DetailStatus.Text = sb.ToString().TrimEnd();
 
-        InstallButton.IsEnabled = !sel.IsConfigured;
-        RemoveButton.IsEnabled = sel.IsConfigured;
+        InstallButton.IsEnabled    = !sel.IsConfigured;
+        RemoveButton.IsEnabled     = sel.IsConfigured;
+        LaunchSteamButton.Visibility = Visibility.Visible;
     }
 
     private async Task<bool> EnsureSteamToolsOrContinueAnywayAsync()
@@ -610,6 +630,7 @@ public sealed partial class HomePage : Page
         }
 
         InstallButton.IsEnabled = false;
+        SetInstallProgressIndeterminate(“Fetching from GameGen...”);
 
         try
         {
@@ -622,31 +643,46 @@ public sealed partial class HomePage : Page
             {
                 var storefrontName = listing.NameOnStore ?? row.DisplayName;
                 var when = string.IsNullOrWhiteSpace(listing.ReleaseDateCaption)
-                    ? "Steam marks this title as Coming soon."
+                    ? “Steam marks this title as Coming soon.”
                     : listing.ReleaseDateCaption!.Trim();
 
-                DetailStatus.Text = $"Coming soon on Steam storefront: “{when}”.";
+                DetailStatus.Text = $”Coming soon on Steam storefront: “{when}”.”;
                 var proceedSoon = await ChooseContinueAnywayAsync(
-                    "Game not released yet",
-                    $"“{storefrontName}” is not publicly released ({when}). GameGen frequently has nothing to generate until launch.\n\nYou can retry after release or dismiss with Stop.",
-                    "Stop install",
-                    "Try GameGen anyway");
+                    “Game not released yet”,
+                    $””{storefrontName}” is not publicly released ({when}). GameGen frequently has nothing to generate until launch.\n\nYou can retry after release or dismiss with Stop.”,
+                    “Stop install”,
+                    “Try GameGen anyway”);
 
                 if (!proceedSoon)
                     return;
             }
 
+            // Progress: spinner until ZIP starts streaming, then switch to progress bar
+            var downloadProgress = new Progress<double>(pct =>
+            {
+                if (InstallProgressRing.Visibility == Visibility.Visible)
+                {
+                    InstallProgressRing.IsActive = false;
+                    InstallProgressRing.Visibility = Visibility.Collapsed;
+                    InstallProgressBar.Visibility = Visibility.Visible;
+                }
+                InstallProgressBar.Value = pct;
+                InstallProgressText.Text = $”Downloading ZIP... {pct:0}%”;
+            });
+
             var zipResult = await TypedApp.Svcs.GameGenApi
-                .DownloadGenerateZipAsync(apiKey.Trim(), row.AppId, CancellationToken.None);
+                .DownloadGenerateZipAsync(apiKey.Trim(), row.AppId, CancellationToken.None, downloadProgress);
+
+            HideInstallProgress();
 
             if (!zipResult.Ok || zipResult.ZipBytes is null)
             {
                 var err = zipResult.ErrorMessage ??
-                          "GameGen response could not be turned into manifest artifacts.";
+                          “GameGen response could not be turned into manifest artifacts.”;
                 DetailStatus.Text = err;
                 await ShowInfoAsync(
-                    "GameGen couldn’t fetch the ZIP",
-                    err + "\n\nConfirm your key, Steam App ID, and that GameGen has data for this title.");
+                    “GameGen couldn’t fetch the ZIP”,
+                    err + “\n\nConfirm your key, Steam App ID, and that GameGen has data for this title.”);
                 return;
             }
 
@@ -658,33 +694,54 @@ public sealed partial class HomePage : Page
             catch (InvalidOperationException ex)
             {
                 DetailStatus.Text = ex.Message;
-                await ShowInfoAsync("Install blocked", ex.Message + "\n\nCheck Steam paths in Settings or ZIP contents (.lua/.manifest).");
+                await ShowInfoAsync(“Install blocked”, ex.Message + “\n\nCheck Steam paths in Settings or ZIP contents (.lua/.manifest).”);
                 return;
             }
 
             row.IsConfigured = true;
             HydrateTrackedState(row);
+            DetailStatus.Text = $”Install finished for App ID {row.AppId}.”;
 
-            DetailStatus.Text = $"Install finished for App ID {row.AppId}.";
+            // Offer to run SteamTools if found
+            if (TypedApp.Svcs.SteamToolsLocator.TryFindSteamTools(out var toolsPath))
+            {
+                var runTools = await AskRunSteamToolsAsync().ConfigureAwait(true);
+                if (runTools)
+                {
+                    try
+                    {
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = toolsPath,
+                            UseShellExecute = true,
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        DetailStatus.Text += $”\nCould not launch SteamTools: {ex.Message}”;
+                    }
+                }
+            }
 
             await OfferSteamGracefulRestartAfterManifestMutationAsync(
-                "Manifest files were installed. Restart the Steam client now so it reloads stplug-in and depot cache changes.",
-                " Restart Steam yourself when convenient so depot and plugin layouts reload.").ConfigureAwait(true);
+                “Manifest files were installed. Restart the Steam client now so it reloads stplug-in and depot cache changes.”,
+                “ Restart Steam yourself when convenient so depot and plugin layouts reload.”).ConfigureAwait(true);
         }
         catch (OperationCanceledException)
         {
-            DetailStatus.Text = "Install cancelled.";
+            DetailStatus.Text = “Install cancelled.”;
         }
         catch (Exception ex)
         {
-            DetailStatus.Text = $"Install failed: {ex.Message}";
+            DetailStatus.Text = $”Install failed: {ex.Message}”;
             await ShowInfoAsync(
-                "Install failed",
-                ex.Message + "\n\nCheck Steam paths, antivirus blocking HTTP, and GameGen service status.",
-                "Close");
+                “Install failed”,
+                ex.Message + “\n\nCheck Steam paths, antivirus blocking HTTP, and GameGen service status.”,
+                “Close”);
         }
         finally
         {
+            HideInstallProgress();
             RefreshDetailPanel();
             SyncDiscordPresenceFromHome();
         }
@@ -757,6 +814,87 @@ public sealed partial class HomePage : Page
         catch (Exception ex)
         {
             DetailStatus.Text = $"Couldn't launch Explorer: {ex.Message}";
+        }
+    }
+
+    // ── Launch in Steam ───────────────────────────────────────────────────────
+
+    private void LaunchSteam_Click(object sender, RoutedEventArgs e)
+    {
+        var sel = SelectedRow;
+        if (sel is null) return;
+
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName        = $"steam://run/{sel.AppId}",
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception ex)
+        {
+            DetailStatus.Text = $"Couldn't launch Steam: {ex.Message}";
+        }
+    }
+
+    // ── SteamTools dialog ─────────────────────────────────────────────────────
+
+    private async Task<bool> AskRunSteamToolsAsync()
+    {
+        var dlg = new ContentDialog
+        {
+            Title              = "Run SteamTools?",
+            Content            = "SteamTools was found. Run it now to activate the installed manifest?",
+            PrimaryButtonText  = "Run SteamTools",
+            CloseButtonText    = "Skip",
+            DefaultButton      = ContentDialogButton.Primary,
+            XamlRoot           = XamlRoot!,
+        };
+        return await dlg.ShowAsync() == ContentDialogResult.Primary;
+    }
+
+    // ── Install progress helpers ──────────────────────────────────────────────
+
+    private void SetInstallProgressIndeterminate(string text)
+    {
+        InstallProgressPanel.Visibility = Visibility.Visible;
+        InstallProgressRing.IsActive    = true;
+        InstallProgressRing.Visibility  = Visibility.Visible;
+        InstallProgressBar.Visibility   = Visibility.Collapsed;
+        InstallProgressText.Text        = text;
+    }
+
+    private void HideInstallProgress()
+    {
+        InstallProgressPanel.Visibility = Visibility.Collapsed;
+        InstallProgressRing.IsActive    = false;
+        InstallProgressRing.Visibility  = Visibility.Collapsed;
+        InstallProgressBar.Visibility   = Visibility.Collapsed;
+        InstallProgressBar.Value        = 0;
+        InstallProgressText.Text        = string.Empty;
+    }
+
+    // ── Keyboard accelerators ─────────────────────────────────────────────────
+
+    private void FocusSearch_Accelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        if (SearchBox.Visibility == Visibility.Visible)
+        {
+            SearchBox.Focus(FocusState.Keyboard);
+            args.Handled = true;
+        }
+    }
+
+    private void Refresh_Accelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        if (RefreshInstalledButton.Visibility == Visibility.Visible)
+        {
+            if (SourceCombo.SelectedIndex == 2)
+                LoadTrackedLibrary();
+            else
+                LoadInstalledGames();
+            args.Handled = true;
         }
     }
 }

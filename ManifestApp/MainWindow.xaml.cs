@@ -9,21 +9,27 @@ namespace ManifestApp;
 
 public sealed partial class MainWindow : Window
 {
+    private TrayIconService? _trayIcon;
+    private bool             _reallyClosing;
+
     public MainWindow()
     {
         InitializeComponent();
 
-        Closed += (_, _) =>
-        {
-            try
+        // Minimize to tray on the X button; only close for real from the tray "Exit" menu
+        AppWindow.Closing += OnAppWindowClosing;
+
+        // Create system tray icon
+        var uiQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+        _trayIcon = new TrayIconService(
+            uiQueue,
+            onOpen:         ShowFromTray,
+            onCheckUpdates: OpenSettingsForUpdates,
+            onExit: () =>
             {
-                ((App)Application.Current).Svcs.DiscordPresence.Dispose();
-            }
-            catch
-            {
-                /* ignore */
-            }
-        };
+                _reallyClosing = true;
+                Close();
+            });
 
         NavFrame.Navigated += NavFrame_OnNavigated;
 
@@ -41,6 +47,35 @@ public sealed partial class MainWindow : Window
     {
         if (e.WindowActivationState != WindowActivationState.Deactivated)
             SyncCaptionButtonColors();
+    }
+
+    private void OnAppWindowClosing(AppWindow sender, AppWindowClosingEventArgs e)
+    {
+        if (_reallyClosing)
+        {
+            // Real exit: clean up tray and Discord
+            _trayIcon?.Dispose();
+            _trayIcon = null;
+            try { ((App)Application.Current).Svcs.DiscordPresence.Dispose(); } catch { /* ignore */ }
+            return;
+        }
+
+        // Hide to tray instead of closing
+        e.Cancel = true;
+        sender.Hide();
+    }
+
+    private void ShowFromTray()
+    {
+        AppWindow.Show();
+        Activate();
+    }
+
+    private void OpenSettingsForUpdates()
+    {
+        ShowFromTray();
+        if (NavFrame.CurrentSourcePageType != typeof(SettingsPage))
+            NavFrame.Navigate(typeof(SettingsPage));
     }
 
     private void NavFrame_OnNavigated(object sender, NavigationEventArgs e)
