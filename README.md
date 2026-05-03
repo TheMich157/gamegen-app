@@ -51,37 +51,6 @@ A Windows desktop app for searching the Steam Store, managing Steam game manifes
 
 ---
 
-## Building from Source
-
-**Prerequisites:** .NET 10 SDK, Windows App SDK 2.x workload
-
-```bash
-git clone https://github.com/TheMich157/gamegen-app.git
-cd gamegen-app
-dotnet build ManifestApp/ManifestApp.csproj -c Debug
-```
-
-**Publish as a single-file exe (x64):**
-
-```bash
-dotnet publish ManifestApp/ManifestApp.csproj -c Release /p:Platform=x64 /p:PublishProfile=single-file-win-x64
-# Output: publish/singlefile-win-x64/ManifestApp.exe
-```
-
----
-
-## Releases & Updates
-
-The app checks for updates via the GitHub Releases API.  
-To release a new version:
-
-1. Bump `<Version>` in `ManifestApp/ManifestApp.csproj`
-2. Build and publish the single-file exe
-3. Create a GitHub Release tagged `vX.Y.Z` with `ManifestApp.exe` attached as a release asset
-
-Users on older versions will see an **Install update** prompt in Settings → About and can apply it in one click.
-
----
 
 ## License
 
