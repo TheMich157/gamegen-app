@@ -8,9 +8,10 @@ namespace ManifestApp.Pages;
 
 public sealed partial class SettingsPage : Page
 {
-    private bool _suppressDarkThemeToggle;
-    private bool _suppressDiscordPresenceToggle;
-    private string? _latestReleaseUrl;
+    private bool    _suppressDarkThemeToggle;
+    private bool    _suppressDiscordPresenceToggle;
+    private string? _latestExeDownloadUrl;
+    private string? _latestUpdaterBatPath;
 
     public SettingsPage()
     {
@@ -61,9 +62,10 @@ public sealed partial class SettingsPage : Page
     private async void CheckUpdates_Click(object sender, RoutedEventArgs e)
     {
         CheckUpdatesButton.IsEnabled = false;
+        InstallUpdateButton.Visibility = Visibility.Collapsed;
         UpdateInfoBar.IsOpen = false;
-        DownloadUpdateButton.Visibility = Visibility.Collapsed;
-        _latestReleaseUrl = null;
+        _latestExeDownloadUrl = null;
+        _latestUpdaterBatPath = null;
 
         try
         {
@@ -71,23 +73,22 @@ public sealed partial class SettingsPage : Page
 
             if (result is null)
             {
-                UpdateInfoBar.Severity = Microsoft.UI.Xaml.Controls.InfoBarSeverity.Warning;
-                UpdateInfoBar.Title = "Could not check for updates";
-                UpdateInfoBar.Message = "Make sure you're connected to the internet, or the GitHub repo hasn't been configured yet.";
+                UpdateInfoBar.Severity = InfoBarSeverity.Warning;
+                UpdateInfoBar.Title   = "Could not check for updates";
+                UpdateInfoBar.Message = "Make sure you're connected to the internet.";
             }
             else if (result.IsUpdateAvailable)
             {
-                UpdateInfoBar.Severity = Microsoft.UI.Xaml.Controls.InfoBarSeverity.Informational;
-                UpdateInfoBar.Title = $"Update available — v{result.LatestVersion.ToString(3)}";
-                UpdateInfoBar.Message = $"You're on v{result.CurrentVersion.ToString(3)}. A newer release is ready to download.";
-                _latestReleaseUrl = result.ReleaseUrl;
-                DownloadUpdateButton.NavigateUri = new Uri(result.ReleaseUrl);
-                DownloadUpdateButton.Visibility = Visibility.Visible;
+                UpdateInfoBar.Severity = InfoBarSeverity.Informational;
+                UpdateInfoBar.Title   = $"Update available — v{result.LatestVersion.ToString(3)}";
+                UpdateInfoBar.Message = $"You're on v{result.CurrentVersion.ToString(3)}. Click Install to download and apply.";
+                _latestExeDownloadUrl = result.ExeDownloadUrl;
+                InstallUpdateButton.Visibility = Visibility.Visible;
             }
             else
             {
-                UpdateInfoBar.Severity = Microsoft.UI.Xaml.Controls.InfoBarSeverity.Success;
-                UpdateInfoBar.Title = "You're up to date";
+                UpdateInfoBar.Severity = InfoBarSeverity.Success;
+                UpdateInfoBar.Title   = "You're up to date";
                 UpdateInfoBar.Message = $"v{result.CurrentVersion.ToString(3)} is the latest release.";
             }
 
@@ -97,6 +98,60 @@ public sealed partial class SettingsPage : Page
         {
             CheckUpdatesButton.IsEnabled = true;
         }
+    }
+
+    private async void InstallUpdate_Click(object sender, RoutedEventArgs e)
+    {
+        // If already downloaded, apply immediately
+        if (_latestUpdaterBatPath is not null)
+        {
+            UpdateService.ApplyUpdate(_latestUpdaterBatPath);
+            return;
+        }
+
+        if (_latestExeDownloadUrl is null)
+            return;
+
+        InstallUpdateButton.IsEnabled   = false;
+        CheckUpdatesButton.IsEnabled    = false;
+        UpdateProgressBar.Value         = 0;
+        UpdateProgressBar.Visibility    = Visibility.Visible;
+        UpdateProgressText.Text         = "Downloading...";
+        UpdateProgressText.Visibility   = Visibility.Visible;
+
+        var progress = new Progress<double>(pct =>
+        {
+            UpdateProgressBar.Value = pct;
+            UpdateProgressText.Text = $"Downloading... {pct:0}%";
+        });
+
+        var batPath = await TypedApp.Svcs.UpdateChecker.DownloadUpdateAsync(
+            _latestExeDownloadUrl, progress);
+
+        if (batPath is null)
+        {
+            UpdateProgressBar.Visibility  = Visibility.Collapsed;
+            UpdateProgressText.Visibility = Visibility.Collapsed;
+            UpdateInfoBar.Severity = InfoBarSeverity.Error;
+            UpdateInfoBar.Title   = "Download failed";
+            UpdateInfoBar.Message = "Could not download the update. Try again later.";
+            UpdateInfoBar.IsOpen  = true;
+            InstallUpdateButton.IsEnabled = true;
+            CheckUpdatesButton.IsEnabled  = true;
+            return;
+        }
+
+        _latestUpdaterBatPath           = batPath;
+        UpdateProgressBar.Visibility    = Visibility.Collapsed;
+        UpdateProgressText.Visibility   = Visibility.Collapsed;
+        InstallUpdateButton.Content     = "Restart & apply update";
+        InstallUpdateButton.IsEnabled   = true;
+        CheckUpdatesButton.IsEnabled    = true;
+
+        UpdateInfoBar.Severity = InfoBarSeverity.Success;
+        UpdateInfoBar.Title   = "Download complete";
+        UpdateInfoBar.Message = "Click 'Restart & apply update' to install.";
+        UpdateInfoBar.IsOpen  = true;
     }
 
     private void DarkThemeToggle_Toggled(object sender, RoutedEventArgs e)

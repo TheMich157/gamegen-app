@@ -152,11 +152,25 @@
                     Click="CheckUpdates_Click"
                     Content="Check for updates" />
 
-                <HyperlinkButton
-                    x:Name="DownloadUpdateButton"
-                    Visibility="Collapsed"
-                    Content="Download update" />
+                <Button
+                    x:Name="InstallUpdateButton"
+                    Click="InstallUpdate_Click"
+                    Content="Install update"
+                    Style="{StaticResource AccentButtonStyle}"
+                    Visibility="Collapsed" />
             </StackPanel>
+
+            <ProgressBar
+                x:Name="UpdateProgressBar"
+                Maximum="100"
+                Visibility="Collapsed"
+                Margin="0,4,0,0" />
+
+            <TextBlock
+                x:Name="UpdateProgressText"
+                FontSize="12"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Visibility="Collapsed" />
 
         </StackPanel>
     </ScrollViewer>
