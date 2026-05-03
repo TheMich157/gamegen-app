@@ -1,0 +1,42 @@
+﻿using Microsoft.UI.Xaml;
+
+namespace ManifestApp;
+
+public partial class App : Application
+{
+    internal AppServices Svcs { get; }
+
+    /// <summary>Primary shell window — required for pickers and dialogs.</summary>
+    internal Window MainShell { get; private set; } = null!;
+
+    public App()
+    {
+        // Single-file WASDK bootstrap: PRI/runtime layout resolves under the extraction/root dir.
+        Environment.SetEnvironmentVariable(
+            "MICROSOFT_WINDOWSAPPRUNTIME_BASE_DIRECTORY",
+            AppContext.BaseDirectory);
+
+        InitializeComponent();
+
+        Svcs = new AppServices(CreateHttpClient());
+    }
+
+    private static HttpClient CreateHttpClient()
+    {
+        var client = new HttpClient
+        {
+            Timeout = TimeSpan.FromMinutes(10),
+        };
+
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("GameGenApp/1.0 (Windows Desktop; WinUI 3)");
+        return client;
+    }
+
+    protected override void OnLaunched(LaunchActivatedEventArgs args)
+    {
+        var window = new MainWindow();
+        MainShell = window;
+        window.NavigateShell();
+        window.Activate();
+    }
+}

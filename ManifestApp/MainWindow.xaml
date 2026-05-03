@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Window
+    x:Class="ManifestApp.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="using:ManifestApp"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    Title="GameGen App"
+    mc:Ignorable="d">
+    <Window.SystemBackdrop>
+        <MicaBackdrop />
+    </Window.SystemBackdrop>
+
+    <Grid x:Name="RootChrome">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="48" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <TitleBar
+            x:Name="AppTitleBar"
+            Title="GameGen App"
+            BackRequested="TitleBar_BackRequested"
+            IsBackButtonVisible="{x:Bind NavFrame.CanGoBack, Mode=OneWay}"
+            IsPaneToggleButtonVisible="True"
+            PaneToggleRequested="TitleBar_PaneToggleRequested">
+            <TitleBar.IconSource>
+                <ImageIconSource ImageSource="ms-appx:///Assets/GameGenAppLogo.png" />
+            </TitleBar.IconSource>
+        </TitleBar>
+
+        <!-- Wrap so first-run onboarding can stay visible while NavigationView is collapsed (NavFrame lives inside NavView). -->
+        <Grid Grid.Row="1">
+            <NavigationView
+                x:Name="NavView"
+                PaneDisplayMode="Left"
+                IsBackButtonVisible="Collapsed"
+                IsPaneToggleButtonVisible="False"
+                IsSettingsVisible="True"
+                OpenPaneLength="272"
+                SelectionChanged="NavView_SelectionChanged">
+                <NavigationView.MenuItems>
+                    <NavigationViewItem Content="Search" IsSelected="True" Tag="home">
+                        <NavigationViewItem.Icon>
+                            <FontIcon FontSize="16" Glyph="&#xE721;" />
+                        </NavigationViewItem.Icon>
+                    </NavigationViewItem>
+                    <NavigationViewItem Content="Library" Tag="manifest-library">
+                        <NavigationViewItem.Icon>
+                            <FontIcon FontSize="16" Glyph="&#xE8F1;" />
+                        </NavigationViewItem.Icon>
+                    </NavigationViewItem>
+                </NavigationView.MenuItems>
+                <Frame x:Name="NavFrame" />
+            </NavigationView>
+
+            <Grid
+                x:Name="OnboardingHost"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch"
+                Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
+                Visibility="Collapsed">
+                <Frame x:Name="OnboardingFrame" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
+            </Grid>
+        </Grid>
+    </Grid>
+</Window>

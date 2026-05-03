@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="ManifestApp.Core/ManifestApp.Core.csproj" />
+  <Project Path="ManifestApp/ManifestApp.csproj" />
+</Solution>

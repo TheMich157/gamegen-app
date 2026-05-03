@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Application
+    x:Class="ManifestApp.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:ManifestApp">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+                <!-- Other merged dictionaries here -->
+            </ResourceDictionary.MergedDictionaries>
+
+            <local:BoolToVisibilityConverter x:Key="ManifestBoolToVisibility" />
+            <local:NonEmptyStringToVisibilityConverter x:Key="ManifestNonEmptyToVisibility" />
+
+            <!-- Local layout tokens -->
+            <CornerRadius x:Key="ManifestCardCornerRadius">10</CornerRadius>
+            <Thickness x:Key="ManifestCardPadding">18,14,18,16</Thickness>
+            <Thickness x:Key="ManifestInsetPadding">22,14,22,20</Thickness>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

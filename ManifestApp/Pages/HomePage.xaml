@@ -1,0 +1,625 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<Page
+
+    x:Class="ManifestApp.Pages.HomePage"
+
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+
+    xmlns:local="using:ManifestApp"
+
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+
+    NavigationCacheMode="Disabled"
+
+    mc:Ignorable="d">
+
+
+
+    <Grid Padding="{StaticResource ManifestInsetPadding}" RowSpacing="12">
+
+        <Grid.RowDefinitions>
+
+            <RowDefinition Height="Auto" />
+
+            <RowDefinition Height="*" />
+
+        </Grid.RowDefinitions>
+
+
+
+        <ScrollViewer
+
+            Grid.Row="0"
+
+            HorizontalScrollBarVisibility="Disabled"
+
+            HorizontalScrollMode="Disabled"
+
+            VerticalScrollBarVisibility="Auto"
+
+            ZoomMode="Disabled">
+
+            <StackPanel Spacing="16">
+
+                <Border
+
+                    Padding="{StaticResource ManifestCardPadding}"
+
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+
+                    BorderThickness="1"
+
+                    CornerRadius="{StaticResource ManifestCardCornerRadius}">
+
+                    <StackPanel Spacing="12">
+
+                        <StackPanel Orientation="Horizontal" Spacing="14">
+
+                            <Border
+
+                                Width="52"
+
+                                Height="52"
+
+                                VerticalAlignment="Top"
+
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+
+                                BorderThickness="1"
+
+                                CornerRadius="26">
+
+                                <Border Background="{ThemeResource LayerFillColorDefaultBrush}" CornerRadius="25">
+
+                                    <Image
+
+                                        Margin="3"
+
+                                        Source="ms-appx:///Assets/GameGenAppLogo.png"
+
+                                        Stretch="UniformToFill" />
+
+                                </Border>
+
+                            </Border>
+
+                            <StackPanel VerticalAlignment="Center" Spacing="6">
+
+                                <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="GameGen App" />
+
+                                <TextBlock
+
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+
+                                    Text="Steam Store search · storefront App IDs for GameGen manifests"
+
+                                    TextWrapping="WrapWholeWords" />
+
+                            </StackPanel>
+
+                        </StackPanel>
+
+                        <Button
+
+                            HorizontalAlignment="Left"
+
+                            Click="SearchStore_Click"
+
+                            Content="Search"
+
+                            Style="{StaticResource AccentButtonStyle}" />
+
+                        <TextBlock
+
+                            x:Name="HomeIntroText"
+
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+
+                            LineHeight="22"
+
+                            Text="Steam Store finds App IDs; “Installed Steam games” uses your local appmanifest files—the same Steam App IDs GameGen’s /api/{{key}}/generate/{{id}} route expects."
+
+                            TextWrapping="WrapWholeWords" />
+
+                    </StackPanel>
+
+                </Border>
+
+
+
+                <InfoBar
+
+                    x:Name="SteamPathBanner"
+
+                    CornerRadius="{StaticResource ControlCornerRadius}"
+
+                    IsClosable="False"
+
+                    IsOpen="True"
+
+                    Message="Steam install path not detected. Set it in Settings so manifests can deploy to plugin/depotcache folders."
+
+                    Severity="Informational"
+
+                    Visibility="Collapsed" />
+
+
+
+                <Border
+
+                    Padding="{StaticResource ManifestCardPadding}"
+
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+
+                    BorderThickness="1"
+
+                    CornerRadius="{StaticResource ManifestCardCornerRadius}">
+
+                    <StackPanel Spacing="12">
+
+                        <TextBlock
+
+                            FontSize="12"
+
+                            FontWeight="SemiBold"
+
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+
+                            Text="SOURCE" />
+
+                        <ComboBox
+
+                            x:Name="SourceCombo"
+
+                            HorizontalAlignment="Stretch"
+
+                            Header="Games list source"
+
+                            SelectionChanged="SourceCombo_SelectionChanged">
+
+                            <ComboBoxItem Tag="store">
+                                <StackPanel
+                                    MinHeight="32"
+                                    Orientation="Horizontal"
+                                    Spacing="10">
+                                    <FontIcon
+                                        Margin="0,2,0,0"
+                                        VerticalAlignment="Center"
+                                        FontSize="16"
+                                        Glyph="&#xE721;" />
+                                    <TextBlock
+                                        VerticalAlignment="Center"
+                                        Text="Steam Store search (name → storefront App ID)"
+                                        TextWrapping="NoWrap" />
+                                </StackPanel>
+                            </ComboBoxItem>
+
+                            <ComboBoxItem Tag="installed">
+                                <StackPanel
+                                    MinHeight="32"
+                                    Orientation="Horizontal"
+                                    Spacing="10">
+                                    <FontIcon
+                                        Margin="0,2,0,0"
+                                        VerticalAlignment="Center"
+                                        FontSize="16"
+                                        Glyph="&#xE8AB;" />
+                                    <TextBlock
+                                        VerticalAlignment="Center"
+                                        Text="Installed Steam games on this PC (appmanifest *.acf)"
+                                        TextWrapping="NoWrap" />
+                                </StackPanel>
+                            </ComboBoxItem>
+
+                            <ComboBoxItem Tag="library">
+                                <StackPanel
+                                    MinHeight="32"
+                                    Orientation="Horizontal"
+                                    Spacing="10">
+                                    <FontIcon
+                                        Margin="0,2,0,0"
+                                        VerticalAlignment="Center"
+                                        FontSize="16"
+                                        Glyph="&#xE8F1;" />
+                                    <TextBlock
+                                        VerticalAlignment="Center"
+                                        Text="Manifest library (installed via this app, for removal)"
+                                        TextWrapping="NoWrap" />
+                                </StackPanel>
+                            </ComboBoxItem>
+
+                        </ComboBox>
+
+
+
+                        <StackPanel Spacing="8">
+
+                            <AutoSuggestBox
+
+                                x:Name="SearchBox"
+
+                                HorizontalAlignment="Stretch"
+
+                                PlaceholderText="Search Steam Store…"
+
+                                QuerySubmitted="SearchBox_QuerySubmitted" />
+
+
+
+                            <Button
+
+                                x:Name="RefreshInstalledButton"
+
+                                MinWidth="120"
+
+                                Padding="16,8,16,8"
+
+                                HorizontalAlignment="Left"
+
+                                Click="RefreshInstalled_Click"
+
+                                Content="Refresh list"
+
+                                Visibility="Collapsed" />
+
+                        </StackPanel>
+
+                    </StackPanel>
+
+                </Border>
+
+            </StackPanel>
+
+        </ScrollViewer>
+
+
+
+        <Grid
+
+            Grid.Row="1"
+
+            Margin="0,4,0,0"
+
+            ColumnSpacing="12">
+
+            <Grid.ColumnDefinitions>
+
+                <ColumnDefinition Width="*" />
+
+                <ColumnDefinition Width="Auto" />
+
+            </Grid.ColumnDefinitions>
+
+
+
+            <GridView
+
+                x:Name="GamesGrid"
+
+                Grid.Column="0"
+
+                HorizontalAlignment="Stretch"
+
+                VerticalAlignment="Stretch"
+
+                MinHeight="200"
+
+                IsItemClickEnabled="False"
+
+                SelectionMode="Single"
+
+                SelectionChanged="GamesGrid_SelectionChanged">
+
+            <GridView.ItemContainerStyle>
+
+                <Style TargetType="GridViewItem">
+
+                    <Setter Property="Margin" Value="0,0,12,14" />
+
+                    <Setter Property="Padding" Value="0" />
+
+                    <Setter Property="MinWidth" Value="0" />
+
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+
+                </Style>
+
+            </GridView.ItemContainerStyle>
+
+
+
+            <GridView.ItemTemplate>
+
+                <DataTemplate x:DataType="local:GameRowVm">
+
+                    <Border
+
+                        Width="244"
+
+                        Margin="0,0,0,0"
+
+                        Padding="10,10,10,12"
+
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+
+                        BorderThickness="1"
+
+                        CornerRadius="{StaticResource ManifestCardCornerRadius}">
+
+                        <StackPanel Spacing="10">
+
+
+
+                            <Border
+
+                                Height="112"
+
+                                CornerRadius="8"
+
+                                Background="{ThemeResource LayerFillColorDefaultBrush}">
+
+
+
+                                <Grid>
+
+                                    <Image Stretch="UniformToFill">
+
+                                        <Image.Source>
+
+                                            <BitmapImage UriSource="{x:Bind ThumbUri}" />
+
+                                        </Image.Source>
+
+                                    </Image>
+
+
+
+                                    <Border
+
+                                        Margin="8"
+
+                                        Padding="7,3,7,4"
+
+                                        HorizontalAlignment="Right"
+
+                                        VerticalAlignment="Top"
+
+                                        Background="{ThemeResource AccentFillColorDefaultBrush}"
+
+                                        CornerRadius="{StaticResource ControlCornerRadius}"
+
+                                        Visibility="{x:Bind IsConfigured, Converter={StaticResource ManifestBoolToVisibility}}">
+
+
+
+                                        <TextBlock
+
+                                            FontSize="11"
+
+                                            FontWeight="SemiBold"
+
+                                            Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
+
+                                            Text="Tracked" />
+
+
+
+                                    </Border>
+
+                                </Grid>
+
+                            </Border>
+
+
+
+                            <TextBlock
+
+                                FontWeight="SemiBold"
+
+                                Text="{x:Bind DisplayName}"
+
+                                MaxLines="3"
+
+                                TextTrimming="CharacterEllipsis"
+
+                                TextWrapping="WrapWholeWords" />
+
+
+
+                            <TextBlock
+
+                                FontSize="12"
+
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+
+                                Text="{x:Bind AppIdFormatted}" />
+
+
+
+                            <TextBlock
+
+                                MaxLines="2"
+
+                                FontSize="12"
+
+                                Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+
+                                Text="{x:Bind TrackingSubtitleLine}"
+
+                                TextTrimming="CharacterEllipsis"
+
+                                TextWrapping="WrapWholeWords"
+
+                                Visibility="{x:Bind TrackingSubtitleLine, Converter={StaticResource ManifestNonEmptyToVisibility}}" />
+
+
+
+                        </StackPanel>
+
+                    </Border>
+
+                </DataTemplate>
+
+            </GridView.ItemTemplate>
+
+        </GridView>
+
+
+
+        <Border
+
+            x:Name="DetailPanel"
+
+            Grid.Column="1"
+
+            MinWidth="260"
+
+            MaxWidth="308"
+
+            Width="288"
+
+            VerticalAlignment="Stretch"
+
+            Padding="12,10"
+
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+
+            BorderThickness="1"
+
+            CornerRadius="{StaticResource ManifestCardCornerRadius}"
+
+            Visibility="Collapsed">
+
+
+
+            <ScrollViewer
+
+                HorizontalScrollBarVisibility="Disabled"
+
+                VerticalScrollBarVisibility="Auto"
+
+                ZoomMode="Disabled">
+
+
+
+            <StackPanel Spacing="10">
+
+                <StackPanel Spacing="4">
+
+                    <TextBlock
+
+                        FontSize="12"
+
+                        FontWeight="SemiBold"
+
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+
+                        Text="DETAILS" />
+
+                    <TextBlock
+
+                        x:Name="DetailTitle"
+
+                        FontSize="18"
+
+                        FontWeight="SemiBold"
+
+                        TextTrimming="CharacterEllipsis"
+
+                        MaxLines="2"
+
+                        TextWrapping="WrapWholeWords" />
+
+                </StackPanel>
+
+
+
+                <TextBlock
+
+                    x:Name="DetailStatus"
+
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+
+                    LineHeight="20"
+
+                    FontSize="13"
+
+                    TextWrapping="WrapWholeWords" />
+
+
+
+                <StackPanel
+
+                    x:Name="DetailActionsRow"
+
+                    Orientation="Horizontal"
+
+                    Spacing="10">
+
+                    <Button
+
+                        x:Name="InstallButton"
+
+                        MinWidth="140"
+
+                        Click="Install_Click"
+
+                        Content="Install manifests"
+
+                        Style="{StaticResource AccentButtonStyle}" />
+
+
+
+                    <Button
+
+                        x:Name="RemoveButton"
+
+                        MinWidth="120"
+
+                        Click="Remove_Click"
+
+                        Content="Remove files" />
+
+                </StackPanel>
+
+
+
+                <MenuFlyoutSeparator />
+
+
+
+                <StackPanel Orientation="Horizontal" Spacing="4">
+
+                    <HyperlinkButton Click="OpenPluginFolder_Click" Content="Open stplug-in" />
+
+                    <HyperlinkButton Click="OpenDepotFolder_Click" Content="Open depotcache" />
+
+                </StackPanel>
+
+
+
+            </StackPanel>
+
+            </ScrollViewer>
+
+        </Border>
+
+        </Grid>
+
+    </Grid>
+
+</Page>
+
