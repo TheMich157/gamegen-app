@@ -50,7 +50,6 @@ public sealed partial class SettingsPage : Page
         PluginPathBox.Text = s.StPluginFolderOverride ?? "";
         DepotPathBox.Text = s.DepotCacheFolderOverride ?? "";
         SteamToolsPathBox.Text = s.SteamToolsExeOverride ?? "";
-        GameGenApiBaseUrlBox.Text = s.GameGenApiBaseUrl ?? "";
 
         ApiKeyStatus.Text = GameGenApiKeyStore.TryRetrieve(out _)
             ? "API key is saved securely on this device."
@@ -193,10 +192,6 @@ public sealed partial class SettingsPage : Page
 
     private void SaveGameGenSettings_Click(object sender, RoutedEventArgs e)
     {
-        var cur = TypedApp.Svcs.SettingsStore.Load();
-        cur.GameGenApiBaseUrl = NormalizeOrNull(GameGenApiBaseUrlBox.Text);
-        TypedApp.Svcs.SettingsStore.Save(cur);
-
         var keyProvided = false;
         if (!string.IsNullOrWhiteSpace(ApiKeyBox.Password))
         {
@@ -209,8 +204,8 @@ public sealed partial class SettingsPage : Page
         var vaultOk = GameGenApiKeyStore.TryRetrieve(out _);
         ApiKeyStatus.Text = vaultOk switch
         {
-            true when keyProvided => "API key updated securely. Endpoint preference saved.",
-            true => "Endpoint saved; API key unchanged in Credential Locker.",
+            true when keyProvided => "API key updated securely.",
+            true => "API key unchanged in Credential Locker.",
             false when keyProvided => "Key storage failed unexpectedly — retry.",
             _ => "No API key is stored yet. Paste your key above to authorize GameGen HTTPS calls.",
         };

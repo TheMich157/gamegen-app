@@ -4,6 +4,7 @@ using ManifestApp.Core;
 using ManifestApp.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Navigation;
 using Microsoft.UI.Dispatching;
 
@@ -183,7 +184,7 @@ public sealed partial class HomePage : Page
             if (hits.Count == 0)
             {
                 DetailStatus.Text =
-                    $"No results for “{query}”. Try another name, DLC, or paste a numeric App ID.";
+                    $"No results for \"{query}\". Try another name, DLC, or paste a numeric App ID.";
                 GamesGrid.ItemsSource = new ObservableCollection<GameRowVm>();
                 return;
             }
@@ -620,7 +621,7 @@ public sealed partial class HomePage : Page
                     $"App ID {row.AppId} is not listed in your local Steam manifests — install/update it in Steam first.";
                 var proceedLocal = await ChooseContinueAnywayAsync(
                     "Game not installed locally",
-                    $"“{row.DisplayName}” (App ID {row.AppId}) is not in your enumerated Steam libraries (no appmanifest match).\n\nDownload or repair the game through Steam unless you knowingly continue.",
+                    $"\"{row.DisplayName}\" (App ID {row.AppId}) is not in your enumerated Steam libraries (no appmanifest match).\n\nDownload or repair the game through Steam unless you knowingly continue.",
                     "Stop",
                     "Continue anyway");
 
@@ -630,7 +631,7 @@ public sealed partial class HomePage : Page
         }
 
         InstallButton.IsEnabled = false;
-        SetInstallProgressIndeterminate(“Fetching from GameGen...”);
+        SetInstallProgressIndeterminate("Fetching from GameGen...");
 
         try
         {
@@ -643,15 +644,15 @@ public sealed partial class HomePage : Page
             {
                 var storefrontName = listing.NameOnStore ?? row.DisplayName;
                 var when = string.IsNullOrWhiteSpace(listing.ReleaseDateCaption)
-                    ? “Steam marks this title as Coming soon.”
+                    ? "Steam marks this title as Coming soon."
                     : listing.ReleaseDateCaption!.Trim();
 
-                DetailStatus.Text = $”Coming soon on Steam storefront: “{when}”.”;
+                DetailStatus.Text = $"Coming soon on Steam storefront: \"{when}\".";
                 var proceedSoon = await ChooseContinueAnywayAsync(
-                    “Game not released yet”,
-                    $””{storefrontName}” is not publicly released ({when}). GameGen frequently has nothing to generate until launch.\n\nYou can retry after release or dismiss with Stop.”,
-                    “Stop install”,
-                    “Try GameGen anyway”);
+                    "Game not released yet",
+                    $"\"{storefrontName}\" is not publicly released ({when}). GameGen frequently has nothing to generate until launch.\n\nYou can retry after release or dismiss with Stop.",
+                    "Stop install",
+                    "Try GameGen anyway");
 
                 if (!proceedSoon)
                     return;
@@ -667,7 +668,7 @@ public sealed partial class HomePage : Page
                     InstallProgressBar.Visibility = Visibility.Visible;
                 }
                 InstallProgressBar.Value = pct;
-                InstallProgressText.Text = $”Downloading ZIP... {pct:0}%”;
+                InstallProgressText.Text = $"Downloading ZIP... {pct:0}%";
             });
 
             var zipResult = await TypedApp.Svcs.GameGenApi
@@ -678,11 +679,11 @@ public sealed partial class HomePage : Page
             if (!zipResult.Ok || zipResult.ZipBytes is null)
             {
                 var err = zipResult.ErrorMessage ??
-                          “GameGen response could not be turned into manifest artifacts.”;
+                          "GameGen response could not be turned into manifest artifacts.";
                 DetailStatus.Text = err;
                 await ShowInfoAsync(
-                    “GameGen couldn’t fetch the ZIP”,
-                    err + “\n\nConfirm your key, Steam App ID, and that GameGen has data for this title.”);
+                    "GameGen couldn’t fetch the ZIP",
+                    err + "\n\nConfirm your key, Steam App ID, and that GameGen has data for this title.");
                 return;
             }
 
@@ -694,13 +695,13 @@ public sealed partial class HomePage : Page
             catch (InvalidOperationException ex)
             {
                 DetailStatus.Text = ex.Message;
-                await ShowInfoAsync(“Install blocked”, ex.Message + “\n\nCheck Steam paths in Settings or ZIP contents (.lua/.manifest).”);
+                await ShowInfoAsync("Install blocked", ex.Message + "\n\nCheck Steam paths in Settings or ZIP contents (.lua/.manifest).");
                 return;
             }
 
             row.IsConfigured = true;
             HydrateTrackedState(row);
-            DetailStatus.Text = $”Install finished for App ID {row.AppId}.”;
+            DetailStatus.Text = $"Install finished for App ID {row.AppId}.";
 
             // Offer to run SteamTools if found
             if (TypedApp.Svcs.SteamToolsLocator.TryFindSteamTools(out var toolsPath))
@@ -718,26 +719,26 @@ public sealed partial class HomePage : Page
                     }
                     catch (Exception ex)
                     {
-                        DetailStatus.Text += $”\nCould not launch SteamTools: {ex.Message}”;
+                        DetailStatus.Text += $"\nCould not launch SteamTools: {ex.Message}";
                     }
                 }
             }
 
             await OfferSteamGracefulRestartAfterManifestMutationAsync(
-                “Manifest files were installed. Restart the Steam client now so it reloads stplug-in and depot cache changes.”,
-                “ Restart Steam yourself when convenient so depot and plugin layouts reload.”).ConfigureAwait(true);
+                "Manifest files were installed. Restart the Steam client now so it reloads stplug-in and depot cache changes.",
+                " Restart Steam yourself when convenient so depot and plugin layouts reload.").ConfigureAwait(true);
         }
         catch (OperationCanceledException)
         {
-            DetailStatus.Text = “Install cancelled.”;
+            DetailStatus.Text = "Install cancelled.";
         }
         catch (Exception ex)
         {
-            DetailStatus.Text = $”Install failed: {ex.Message}”;
+            DetailStatus.Text = $"Install failed: {ex.Message}";
             await ShowInfoAsync(
-                “Install failed”,
-                ex.Message + “\n\nCheck Steam paths, antivirus blocking HTTP, and GameGen service status.”,
-                “Close”);
+                "Install failed",
+                ex.Message + "\n\nCheck Steam paths, antivirus blocking HTTP, and GameGen service status.",
+                "Close");
         }
         finally
         {

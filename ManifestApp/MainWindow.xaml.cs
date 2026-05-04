@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml.Navigation;
 using ManifestApp.Pages;
+using ManifestApp.Services;
 using Windows.UI;
 
 namespace ManifestApp;

@@ -103,19 +103,13 @@
                 Text="Enter your GameGen API key from gamegen.lol (your dashboard). Downloads will not succeed until it is pasted and saved here."
                 TextWrapping="WrapWholeWords" />
 
-            <TextBox
-                x:Name="GameGenApiBaseUrlBox"
-                AutomationProperties.HelpText="Leave empty to use https://gamegen.lol"
-                Header="GameGen API base URL (optional)"
-                PlaceholderText="https://gamegen.lol" />
-
             <PasswordBox
                 x:Name="ApiKeyBox"
                 Header="Your GameGen API key"
                 PlaceholderText="Paste key, then tap Save API key securely" />
 
             <Button Margin="0,8,0,0" Click="SaveGameGenSettings_Click"
-                    Content="Save endpoint &amp; API key" />
+                    Content="Save API key" />
 
             <TextBlock Margin="0,8,0,0" FontSize="12" Opacity="0.7"
                        TextWrapping="WrapWholeWords"
