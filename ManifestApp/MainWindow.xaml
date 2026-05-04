@@ -5,6 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:local="using:ManifestApp"
+    xmlns:pages="using:ManifestApp.Pages"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     Title="GameGen App"
     mc:Ignorable="d">
@@ -62,6 +63,11 @@
                 Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
                 Visibility="Collapsed">
                 <Frame x:Name="OnboardingFrame" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
+            </Grid>
+
+            <!-- Startup splash; sits on top of NavigationView and OnboardingHost until init completes. -->
+            <Grid x:Name="SplashHost" IsHitTestVisible="True">
+                <pages:SplashOverlay x:Name="Splash" />
             </Grid>
         </Grid>
     </Grid>

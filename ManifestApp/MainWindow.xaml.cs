@@ -12,6 +12,7 @@ public sealed partial class MainWindow : Window
 {
     private TrayIconService? _trayIcon;
     private bool             _reallyClosing;
+    private bool             _splashStarted;
 
     public MainWindow()
     {
@@ -48,6 +49,65 @@ public sealed partial class MainWindow : Window
     {
         if (e.WindowActivationState != WindowActivationState.Deactivated)
             SyncCaptionButtonColors();
+
+        if (!_splashStarted && e.WindowActivationState != WindowActivationState.Deactivated)
+        {
+            _splashStarted = true;
+            _ = RunStartupSequenceAsync();
+        }
+    }
+
+    /// <summary>
+    /// Drives the splash overlay through its intro, the background update check, and the outro.
+    /// Calls <see cref="NavigateShell"/> behind the splash so the real UI is ready when the splash fades.
+    /// </summary>
+    private async Task RunStartupSequenceAsync()
+    {
+        var svcs = ((App)Application.Current).Svcs;
+
+        try
+        {
+            await Splash.PlayIntroAsync();
+
+            // Step 0 — Check for updates
+            Splash.SetStep(SplashOverlay.SplashStep.CheckUpdates, SplashOverlay.StepState.Active);
+            var updateTask = svcs.UpdateChecker.CheckAsync();
+            // Min display time so a fast network doesn't make the step feel like a flicker.
+            await Task.WhenAll(updateTask, Task.Delay(700));
+            var result = await updateTask;
+            if (result?.IsUpdateAvailable == true)
+                svcs.StartupUpdateResult = result;
+
+            Splash.SetStep(SplashOverlay.SplashStep.CheckUpdates, SplashOverlay.StepState.Done,
+                result?.IsUpdateAvailable == true
+                    ? $"Update available  ·  v{result.LatestVersion}"
+                    : "Up to date");
+            await Task.Delay(220);
+
+            // Step 1 — Preparing workspace (set up the real shell behind the splash)
+            Splash.SetStep(SplashOverlay.SplashStep.Workspace, SplashOverlay.StepState.Active);
+            await Task.Delay(280);
+            NavigateShell();
+            Splash.SetStep(SplashOverlay.SplashStep.Workspace, SplashOverlay.StepState.Done);
+            await Task.Delay(180);
+
+            // Step 2 — Ready
+            Splash.SetStep(SplashOverlay.SplashStep.Ready, SplashOverlay.StepState.Active);
+            await Task.Delay(220);
+            Splash.SetStep(SplashOverlay.SplashStep.Ready, SplashOverlay.StepState.Done);
+            await Task.Delay(260);
+
+            await Splash.PlayOutroAsync();
+        }
+        catch
+        {
+            // Never let a splash hiccup block the app — best-effort fallback to the main shell.
+            try { NavigateShell(); } catch { /* ignore */ }
+        }
+        finally
+        {
+            SplashHost.Visibility = Visibility.Collapsed;
+        }
     }
 
     private void OnAppWindowClosing(AppWindow sender, AppWindowClosingEventArgs e)
