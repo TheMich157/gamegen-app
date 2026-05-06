@@ -21,6 +21,110 @@ public sealed partial class HomePage : Page
     public HomePage()
     {
         InitializeComponent();
+        Loaded += (_, _) => StatusPulse.Begin();
+    }
+
+    /// <summary>
+    /// Offline / API-failure fallback list — used only when Steam's featured endpoint is unreachable
+    /// so the landing grid is never blank.
+    /// </summary>
+    private static readonly (uint AppId, string Name)[] PopularSteamGames =
+    {
+        (730,     "Counter-Strike 2"),
+        (570,     "Dota 2"),
+        (271590,  "Grand Theft Auto V"),
+        (1086940, "Baldur's Gate 3"),
+        (1245620, "Elden Ring"),
+        (1091500, "Cyberpunk 2077"),
+        (252490,  "Rust"),
+        (578080,  "PUBG: BATTLEGROUNDS"),
+        (1888930, "The Last of Us Part I"),
+        (2358720, "Black Myth: Wukong"),
+        (292030,  "The Witcher 3: Wild Hunt"),
+        (1174180, "Red Dead Redemption 2"),
+    };
+
+    /// <summary>Sync entry point — fires the async fetch without blocking navigation.</summary>
+    private void LoadTrendingGames() => _ = LoadTrendingGamesAsync();
+
+    /// <summary>
+    /// Populates <see cref="GamesGrid"/> with Steam's actual current top-sellers.
+    /// Falls back to <see cref="LoadPopularGames"/> on any error so the page is never empty.
+    /// </summary>
+    private async Task LoadTrendingGamesAsync()
+    {
+        DetailTitle.Text  = "Loading trending games…";
+        DetailStatus.Text = "Fetching top sellers from Steam.";
+        GamesGrid.ItemsSource = new ObservableCollection<GameRowVm>();
+
+        try
+        {
+            using var resp = await TypedApp.Svcs.Http
+                .GetAsync("https://store.steampowered.com/api/featuredcategories/?cc=us&l=en")
+                .ConfigureAwait(true);
+            resp.EnsureSuccessStatusCode();
+
+            await using var stream = await resp.Content.ReadAsStreamAsync().ConfigureAwait(true);
+            using var doc = await System.Text.Json.JsonDocument
+                .ParseAsync(stream).ConfigureAwait(true);
+
+            var view = new ObservableCollection<GameRowVm>();
+            if (doc.RootElement.TryGetProperty("top_sellers", out var top) &&
+                top.TryGetProperty("items", out var items) &&
+                items.ValueKind == System.Text.Json.JsonValueKind.Array)
+            {
+                foreach (var item in items.EnumerateArray())
+                {
+                    if (!item.TryGetProperty("id", out var idEl)) continue;
+                    if (!idEl.TryGetUInt32(out var appId) || appId == 0) continue;
+
+                    var name = item.TryGetProperty("name", out var n)
+                        ? (n.GetString() ?? $"Steam App {appId}")
+                        : $"Steam App {appId}";
+
+                    var vm = new GameRowVm(appId, name);
+                    HydrateTrackedState(vm);
+                    _ = FallbackCapsule184Async(vm).ConfigureAwait(false);
+                    view.Add(vm);
+                    if (view.Count >= 18) break;
+                }
+            }
+
+            if (view.Count == 0)
+            {
+                LoadPopularGames();
+                return;
+            }
+
+            GamesGrid.ItemsSource  = view;
+            GamesGrid.SelectedItem = null;
+            DetailPanel.Visibility = Visibility.Collapsed;
+            DetailTitle.Text  = "Trending on Steam";
+            DetailStatus.Text = $"Top sellers right now — {view.Count:N0} titles. Use Search above to find any game.";
+        }
+        catch
+        {
+            LoadPopularGames();
+        }
+    }
+
+    /// <summary>Static fallback population using the curated list above.</summary>
+    private void LoadPopularGames()
+    {
+        var view = new ObservableCollection<GameRowVm>();
+        foreach (var (appId, name) in PopularSteamGames)
+        {
+            var vm = new GameRowVm(appId, name);
+            HydrateTrackedState(vm);
+            _ = FallbackCapsule184Async(vm).ConfigureAwait(false);
+            view.Add(vm);
+        }
+
+        GamesGrid.ItemsSource  = view;
+        GamesGrid.SelectedItem = null;
+        DetailPanel.Visibility = Visibility.Collapsed;
+        DetailTitle.Text  = "Popular on Steam";
+        DetailStatus.Text = "Pick a title below or use Search to find any game on Steam.";
     }
 
     protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -56,12 +160,7 @@ public sealed partial class HomePage : Page
             SourceCombo.SelectedIndex = 0;
             _suppressSourceComboChanged = false;
             ApplyStoreSourceUiOnly();
-            GamesGrid.ItemsSource = new ObservableCollection<GameRowVm>();
-            GamesGrid.SelectedItem = null;
-            DetailPanel.Visibility = Visibility.Collapsed;
-
-            DetailTitle.Text = SelectGameTitleFallback();
-            DetailStatus.Text = "Search the store, then choose a game below.";
+            LoadPopularGames();
             RefreshHomeIntroText();
             return;
         }
@@ -123,7 +222,16 @@ public sealed partial class HomePage : Page
             ApplyStoreSourceUiOnly();
         }
 
-        await RunSteamStoreSearchAsync(SearchBox.Text);
+        // If the user already typed something, run that search. Otherwise drop the
+        // caret into the search bar so they can start typing immediately.
+        var existing = SearchBox.Text?.Trim() ?? string.Empty;
+        if (existing.Length == 0)
+        {
+            SearchBox.Focus(FocusState.Programmatic);
+            return;
+        }
+
+        await RunSteamStoreSearchAsync(existing);
     }
 
     private async void SearchBox_QuerySubmitted(AutoSuggestBox sender,
@@ -431,6 +539,7 @@ public sealed partial class HomePage : Page
             InstallButton.IsEnabled      = false;
             RemoveButton.IsEnabled       = false;
             LaunchSteamButton.Visibility = Visibility.Collapsed;
+            SteamActionsPanel.Visibility = Visibility.Collapsed;
             HideInstallProgress();
             return;
         }
@@ -471,6 +580,7 @@ public sealed partial class HomePage : Page
         InstallButton.IsEnabled    = !sel.IsConfigured;
         RemoveButton.IsEnabled     = sel.IsConfigured;
         LaunchSteamButton.Visibility = Visibility.Visible;
+        SteamActionsPanel.Visibility = Visibility.Visible;
     }
 
     private async Task<bool> EnsureSteamToolsOrContinueAnywayAsync()
@@ -836,6 +946,34 @@ public sealed partial class HomePage : Page
         catch (Exception ex)
         {
             DetailStatus.Text = $"Couldn't launch Steam: {ex.Message}";
+        }
+    }
+
+    /// <summary>Asks Steam to install the selected app (steam://install/&lt;appid&gt;).</summary>
+    private void SteamInstall_Click(object sender, RoutedEventArgs e)
+        => OpenSteamProtocol("install", "Steam install");
+
+    /// <summary>Asks Steam to uninstall the selected app (steam://uninstall/&lt;appid&gt;).</summary>
+    private void SteamUninstall_Click(object sender, RoutedEventArgs e)
+        => OpenSteamProtocol("uninstall", "Steam uninstall");
+
+    private void OpenSteamProtocol(string verb, string label)
+    {
+        var sel = SelectedRow;
+        if (sel is null) return;
+
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName        = $"steam://{verb}/{sel.AppId}",
+                UseShellExecute = true,
+            });
+            DetailStatus.Text = $"Asked Steam to {verb} App ID {sel.AppId}. Confirm in the Steam window.";
+        }
+        catch (Exception ex)
+        {
+            DetailStatus.Text = $"Couldn't trigger {label}: {ex.Message}";
         }
     }
 

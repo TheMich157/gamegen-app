@@ -1,4 +1,4 @@
-﻿using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml;
 
 namespace ManifestApp;
 
@@ -28,7 +28,12 @@ public partial class App : Application
             Timeout = TimeSpan.FromMinutes(10),
         };
 
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("GameGenApp/1.0 (Windows Desktop; WinUI 3)");
+        // Literal "GameGen App <version>" — the space means UserAgent.ParseAdd would treat it
+        // as multiple product tokens, so bypass validation to keep the exact wording.
+        var version = Services.UpdateService.CurrentVersionString;
+        client.DefaultRequestHeaders.TryAddWithoutValidation(
+            "User-Agent",
+            $"GameGen App {version}");
         return client;
     }
 

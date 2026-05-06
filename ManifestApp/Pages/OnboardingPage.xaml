@@ -8,22 +8,24 @@
     NavigationCacheMode="Disabled"
     mc:Ignorable="d">
 
-    <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+    <Grid Background="{StaticResource GameGenHeroSurfaceBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
+        <!-- Top progress strip -->
         <StackPanel
             Grid.Row="0"
-            Padding="32,28,32,8"
-            Spacing="4">
+            Padding="32,28,32,12"
+            Spacing="6">
             <TextBlock
                 x:Name="StepIndicator"
-                Opacity="0.65"
-                Style="{StaticResource CaptionTextBlockStyle}"
-                Text="Step 1 of 3" />
+                FontSize="11" FontWeight="SemiBold"
+                CharacterSpacing="220"
+                Foreground="{StaticResource GameGenAccentGradientBrush}"
+                Text="STEP 1 OF 3" />
             <ProgressBar
                 x:Name="StepProgress"
                 Maximum="2"
@@ -32,50 +34,98 @@
 
         <ScrollViewer
             Grid.Row="1"
-            Padding="32,8,32,16"
+            Padding="32,12,32,16"
             VerticalScrollBarVisibility="Auto">
             <Grid MinHeight="320">
-                <!-- Welcome -->
+
+                <!-- ──────── Welcome ──────── -->
                 <StackPanel
                     x:Name="WelcomePanel"
                     HorizontalAlignment="Center"
                     VerticalAlignment="Center"
                     Loaded="WelcomePanel_Loaded"
                     Opacity="0"
-                    Spacing="16">
+                    Spacing="18">
                     <StackPanel.RenderTransform>
                         <CompositeTransform x:Name="WelcomeTransform" TranslateY="18" />
                     </StackPanel.RenderTransform>
 
-                    <Image
-                        Width="96"
-                        Height="96"
-                        HorizontalAlignment="Center"
-                        Source="ms-appx:///Assets/GameGenAppLogo.png" />
+                    <!-- Logo plate with gradient halo -->
+                    <Grid Width="120" Height="120" HorizontalAlignment="Center">
+                        <Ellipse Width="120" Height="120" Opacity="0.6">
+                            <Ellipse.Fill>
+                                <RadialGradientBrush Center="0.5,0.5" GradientOrigin="0.5,0.5"
+                                                     RadiusX="0.5" RadiusY="0.5">
+                                    <GradientStop Color="#A06E45FF" Offset="0" />
+                                    <GradientStop Color="#003B6BFF" Offset="1" />
+                                </RadialGradientBrush>
+                            </Ellipse.Fill>
+                        </Ellipse>
+                        <Border Width="92" Height="92" CornerRadius="20"
+                                HorizontalAlignment="Center" VerticalAlignment="Center"
+                                Background="{StaticResource GameGenAccentGradientBrush}">
+                            <Image Source="ms-appx:///Assets/GameGenAppLogo.png"
+                                   Stretch="UniformToFill" Margin="6" />
+                        </Border>
+                    </Grid>
+
+                    <!-- Status pill -->
+                    <Border CornerRadius="999" Padding="12,5,16,5"
+                            BorderThickness="1"
+                            BorderBrush="{StaticResource GameGenSubtleAccentStrokeBrush}"
+                            Background="{StaticResource GameGenSubtleAccentBackgroundBrush}"
+                            HorizontalAlignment="Center">
+                        <TextBlock Text="FIRST-RUN SETUP"
+                                   FontSize="11" FontWeight="SemiBold"
+                                   Foreground="#FFB8C8FF"
+                                   CharacterSpacing="160" />
+                    </Border>
+
+                    <StackPanel Spacing="2" HorizontalAlignment="Center">
+                        <TextBlock Text="GAMEGEN"
+                                   FontSize="13" FontWeight="SemiBold"
+                                   HorizontalAlignment="Center"
+                                   Foreground="#809FB7FF"
+                                   CharacterSpacing="240" />
+                        <TextBlock FontSize="48" FontWeight="Bold"
+                                   LineHeight="54" CharacterSpacing="-15"
+                                   HorizontalAlignment="Center"
+                                   Text="WELCOME"
+                                   Foreground="{StaticResource GameGenAccentGradientBrush}" />
+                    </StackPanel>
 
                     <TextBlock
+                        MaxWidth="560"
                         HorizontalAlignment="Center"
-                        Style="{StaticResource TitleTextBlockStyle}"
-                        Text="Welcome to GameGen App"
-                        TextAlignment="Center" />
-
-                    <TextBlock
-                        MaxWidth="520"
-                        HorizontalAlignment="Center"
-                        Opacity="0.78"
+                        Foreground="{StaticResource GameGenSecondaryTextBrush}"
+                        FontSize="14" LineHeight="22"
                         Text="Search your Steam library, generate manifests with GameGen, and install them in a few taps. First, point the app at your Steam folder and add your GameGen API key."
                         TextAlignment="Center"
                         TextWrapping="WrapWholeWords" />
                 </StackPanel>
 
-                <!-- Steam -->
+                <!-- ──────── Steam path ──────── -->
                 <StackPanel
                     x:Name="SteamPanel"
-                    Spacing="12"
+                    Spacing="14"
+                    MaxWidth="640"
+                    HorizontalAlignment="Center"
                     Visibility="Collapsed">
-                    <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="Where is Steam installed?" />
+
+                    <StackPanel Spacing="2">
+                        <TextBlock Text="STEAM PATH"
+                                   FontSize="11" FontWeight="SemiBold"
+                                   CharacterSpacing="220"
+                                   Foreground="{StaticResource GameGenAccentGradientBrush}" />
+                        <TextBlock FontSize="36" FontWeight="Bold"
+                                   LineHeight="42" CharacterSpacing="-10"
+                                   Text="Where is Steam installed?"
+                                   Foreground="#FFEDEDF5" />
+                    </StackPanel>
+
                     <TextBlock
-                        Opacity="0.72"
+                        Foreground="{StaticResource GameGenSecondaryTextBrush}"
+                        FontSize="13" LineHeight="20"
                         Text="We need the folder that contains steam.exe (plugin and depot paths are filled in automatically)."
                         TextWrapping="WrapWholeWords" />
 
@@ -97,28 +147,52 @@
                         TextWrapping="WrapWholeWords"
                         Visibility="Collapsed" />
 
-                    <TextBlock
-                        Margin="0,16,0,0"
-                        FontWeight="SemiBold"
-                        Text="We will use" />
-                    <TextBlock
-                        x:Name="PluginPreview"
-                        Opacity="0.78"
-                        TextWrapping="WrapWholeWords" />
-                    <TextBlock
-                        x:Name="DepotPreview"
-                        Opacity="0.78"
-                        TextWrapping="WrapWholeWords" />
+                    <Border CornerRadius="12" Padding="16,12,16,12"
+                            Margin="0,8,0,0"
+                            BorderThickness="1"
+                            BorderBrush="{StaticResource GameGenSubtleAccentStrokeBrush}"
+                            Background="{StaticResource GameGenSubtleAccentBackgroundBrush}">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="WE WILL USE"
+                                       FontSize="11" FontWeight="SemiBold"
+                                       CharacterSpacing="200"
+                                       Foreground="{StaticResource GameGenAccentGradientBrush}" />
+                            <TextBlock
+                                x:Name="PluginPreview"
+                                Foreground="{StaticResource GameGenSecondaryTextBrush}"
+                                FontSize="12"
+                                TextWrapping="WrapWholeWords" />
+                            <TextBlock
+                                x:Name="DepotPreview"
+                                Foreground="{StaticResource GameGenSecondaryTextBrush}"
+                                FontSize="12"
+                                TextWrapping="WrapWholeWords" />
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
 
-                <!-- API -->
+                <!-- ──────── API key ──────── -->
                 <StackPanel
                     x:Name="ApiPanel"
-                    Spacing="12"
+                    Spacing="14"
+                    MaxWidth="640"
+                    HorizontalAlignment="Center"
                     Visibility="Collapsed">
-                    <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="GameGen API key" />
+
+                    <StackPanel Spacing="2">
+                        <TextBlock Text="API KEY"
+                                   FontSize="11" FontWeight="SemiBold"
+                                   CharacterSpacing="220"
+                                   Foreground="{StaticResource GameGenAccentGradientBrush}" />
+                        <TextBlock FontSize="36" FontWeight="Bold"
+                                   LineHeight="42" CharacterSpacing="-10"
+                                   Text="GameGen API key"
+                                   Foreground="#FFEDEDF5" />
+                    </StackPanel>
+
                     <TextBlock
-                        Opacity="0.72"
+                        Foreground="{StaticResource GameGenSecondaryTextBrush}"
+                        FontSize="13" LineHeight="20"
                         Text="Paste the key from your GameGen dashboard. It is stored only in Windows Credential Locker on this PC."
                         TextWrapping="WrapWholeWords" />
 
@@ -136,30 +210,35 @@
             </Grid>
         </ScrollViewer>
 
-        <Grid
+        <!-- Footer nav -->
+        <Border
             Grid.Row="2"
-            Padding="24,12,24,24"
-            Background="{ThemeResource LayerFillColorDefaultBrush}">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
+            BorderThickness="0,1,0,0"
+            BorderBrush="{StaticResource GameGenHeroStrokeBrush}">
+            <Grid Padding="24,14,24,18">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
 
-            <Button
-                x:Name="BackButton"
-                Grid.Column="1"
-                Margin="0,0,8,0"
-                Click="Back_Click"
-                Content="Back"
-                IsEnabled="False" />
+                <Button
+                    x:Name="BackButton"
+                    Grid.Column="1"
+                    Margin="0,0,8,0"
+                    Padding="20,9,20,9"
+                    Click="Back_Click"
+                    Content="Back"
+                    IsEnabled="False" />
 
-            <Button
-                x:Name="NextButton"
-                Grid.Column="2"
-                Click="Next_Click"
-                Content="Next"
-                Style="{StaticResource AccentButtonStyle}" />
-        </Grid>
+                <Button
+                    x:Name="NextButton"
+                    Grid.Column="2"
+                    Padding="20,9,20,9"
+                    Click="Next_Click"
+                    Content="Next"
+                    Style="{StaticResource AccentButtonStyle}" />
+            </Grid>
+        </Border>
     </Grid>
 </Page>

@@ -9,10 +9,54 @@
     mc:Ignorable="d">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Padding="24,16,24,32" Spacing="12">
-            <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="GameGen App — Settings" />
+        <StackPanel Padding="{StaticResource ManifestInsetPadding}" Spacing="20">
 
-            <TextBlock FontSize="20" FontWeight="SemiBold" Text="Appearance" />
+            <!-- ──────── HERO ──────── -->
+            <Border CornerRadius="20" Padding="32,26,32,26"
+                    BorderThickness="1"
+                    BorderBrush="{StaticResource GameGenHeroStrokeBrush}"
+                    Background="{StaticResource GameGenHeroSurfaceBrush}">
+                <StackPanel Spacing="14">
+
+                    <!-- Status pill -->
+                    <Border CornerRadius="999" Padding="12,5,16,5"
+                            BorderThickness="1"
+                            BorderBrush="{StaticResource GameGenSubtleAccentStrokeBrush}"
+                            Background="{StaticResource GameGenSubtleAccentBackgroundBrush}"
+                            HorizontalAlignment="Left">
+                        <TextBlock Text="CONTROL CENTER"
+                                   FontSize="11" FontWeight="SemiBold"
+                                   Foreground="#FFB8C8FF"
+                                   CharacterSpacing="160" />
+                    </Border>
+
+                    <StackPanel Spacing="2">
+                        <TextBlock Text="GAMEGEN"
+                                   FontSize="13" FontWeight="SemiBold"
+                                   Foreground="#809FB7FF"
+                                   CharacterSpacing="240" />
+                        <TextBlock FontSize="44" FontWeight="Bold"
+                                   LineHeight="50" CharacterSpacing="-15"
+                                   Text="PREFERENCES"
+                                   Foreground="{StaticResource GameGenAccentGradientBrush}" />
+                    </StackPanel>
+
+                    <TextBlock Foreground="{StaticResource GameGenSecondaryTextBrush}"
+                               FontSize="13" LineHeight="20"
+                               MaxWidth="640" HorizontalAlignment="Left"
+                               TextWrapping="WrapWholeWords"
+                               Text="Tune appearance, point GameGen at your Steam folders, store your API key, and stay current with updates." />
+                </StackPanel>
+            </Border>
+
+            <!-- ──────── APPEARANCE ──────── -->
+            <StackPanel Spacing="2">
+                <TextBlock Text="APPEARANCE"
+                           FontSize="11" FontWeight="SemiBold"
+                           CharacterSpacing="220"
+                           Foreground="{StaticResource GameGenAccentGradientBrush}" />
+                <TextBlock FontSize="22" FontWeight="SemiBold" Text="Theme &amp; integrations" />
+            </StackPanel>
 
             <ToggleSwitch
                 x:Name="DarkThemeToggle"
@@ -40,10 +84,17 @@
                 Text="Requires the Discord desktop app. When hidden, GameGen stops updating your Discord status."
                 TextWrapping="WrapWholeWords" />
 
-            <MenuFlyoutSeparator Margin="0,16,0,8" />
+            <!-- ──────── STEAM PATHS ──────── -->
+            <StackPanel Spacing="2" Margin="0,16,0,0">
+                <TextBlock Text="STEAM PATHS"
+                           FontSize="11" FontWeight="SemiBold"
+                           CharacterSpacing="220"
+                           Foreground="{StaticResource GameGenAccentGradientBrush}" />
+                <TextBlock FontSize="22" FontWeight="SemiBold" Text="Where GameGen drops manifests" />
+            </StackPanel>
 
             <TextBlock
-                Opacity="0.72"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                 Text="Steam paths default from the registry. Override them here if installs are unusual or inaccessible."
                 TextWrapping="WrapWholeWords" />
 
@@ -53,10 +104,7 @@
                 AutomationProperties.HelpText="Folder that contains steam.exe"
                 PlaceholderText="Example: C:\Program Files (x86)\Steam" />
 
-            <Button
-                Margin="0,0,0,8"
-                Click="BrowseSteam_Click"
-                Content="Browse folder..." />
+            <Button Margin="0,0,0,8" Click="BrowseSteam_Click" Content="Browse folder..." />
 
             <TextBox
                 x:Name="PluginPathBox"
@@ -84,9 +132,11 @@
                 Header="SteamTools.exe (optional override)"
                 PlaceholderText="Defaults to Steam install folder lookup" />
 
-            <Button Margin="0,0,0,24" Click="BrowseSteamTools_Click" Content="Browse SteamTools.exe..." />
+            <Button Margin="0,0,0,16" Click="BrowseSteamTools_Click" Content="Browse SteamTools.exe..." />
 
-            <Button Click="SaveSettings_Click" Style="{StaticResource AccentButtonStyle}" Content="Save Steam settings" />
+            <Button Click="SaveSettings_Click"
+                    Style="{StaticResource AccentButtonStyle}"
+                    Content="Save Steam settings" />
 
             <TextBlock
                 x:Name="SaveSettingsStatus"
@@ -94,12 +144,17 @@
                 TextWrapping="WrapWholeWords"
                 Visibility="Collapsed" />
 
-            <MenuFlyoutSeparator Margin="0,16,0,16" />
-
-            <TextBlock FontSize="20" FontWeight="SemiBold" Text="GameGen API" />
+            <!-- ──────── GAMEGEN API ──────── -->
+            <StackPanel Spacing="2" Margin="0,16,0,0">
+                <TextBlock Text="GAMEGEN API"
+                           FontSize="11" FontWeight="SemiBold"
+                           CharacterSpacing="220"
+                           Foreground="{StaticResource GameGenAccentGradientBrush}" />
+                <TextBlock FontSize="22" FontWeight="SemiBold" Text="Authorize manifest downloads" />
+            </StackPanel>
 
             <TextBlock
-                Opacity="0.78"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                 Text="Enter your GameGen API key from gamegen.lol (your dashboard). Downloads will not succeed until it is pasted and saved here."
                 TextWrapping="WrapWholeWords" />
 
@@ -108,63 +163,80 @@
                 Header="Your GameGen API key"
                 PlaceholderText="Paste key, then tap Save API key securely" />
 
-            <Button Margin="0,8,0,0" Click="SaveGameGenSettings_Click"
-                    Content="Save API key" />
+            <Button Margin="0,8,0,0"
+                    Click="SaveGameGenSettings_Click"
+                    Content="Save API key"
+                    Style="{StaticResource AccentButtonStyle}" />
 
-            <TextBlock Margin="0,8,0,0" FontSize="12" Opacity="0.7"
+            <TextBlock Margin="0,8,0,0" FontSize="12"
+                       Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                        TextWrapping="WrapWholeWords"
                        Text="Clears password field after saving. Leave password empty to keep the current stored key." />
 
             <TextBlock
                 x:Name="ApiKeyStatus"
-                Opacity="0.78"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                 TextWrapping="WrapWholeWords"
                 Margin="0,8,0,0" />
 
-            <MenuFlyoutSeparator Margin="0,16,0,16" />
-
-            <!-- ── About ───────────────────────────────────────────────────── -->
-            <TextBlock FontSize="20" FontWeight="SemiBold" Text="About" />
-
-            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                <TextBlock VerticalAlignment="Center" Text="Version" />
-                <TextBlock
-                    x:Name="VersionText"
-                    VerticalAlignment="Center"
-                    FontWeight="SemiBold" />
+            <!-- ──────── ABOUT ──────── -->
+            <StackPanel Spacing="2" Margin="0,16,0,0">
+                <TextBlock Text="ABOUT"
+                           FontSize="11" FontWeight="SemiBold"
+                           CharacterSpacing="220"
+                           Foreground="{StaticResource GameGenAccentGradientBrush}" />
+                <TextBlock FontSize="22" FontWeight="SemiBold" Text="Build &amp; updates" />
             </StackPanel>
 
-            <InfoBar
-                x:Name="UpdateInfoBar"
-                IsClosable="True"
-                IsOpen="False"
-                Severity="Informational" />
+            <Border CornerRadius="14" Padding="18,14,18,14"
+                    BorderThickness="1"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                <StackPanel Spacing="10">
+                    <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                        <TextBlock Text="VERSION"
+                                   FontSize="11" FontWeight="SemiBold"
+                                   CharacterSpacing="200"
+                                   Foreground="{StaticResource GameGenMutedTextBrush}"
+                                   VerticalAlignment="Center" />
+                        <TextBlock
+                            x:Name="VersionText"
+                            VerticalAlignment="Center"
+                            FontSize="16" FontWeight="SemiBold"
+                            Foreground="{StaticResource GameGenAccentGradientBrush}" />
+                    </StackPanel>
 
-            <StackPanel Orientation="Horizontal" Spacing="8">
-                <Button
-                    x:Name="CheckUpdatesButton"
-                    Click="CheckUpdates_Click"
-                    Content="Check for updates" />
+                    <InfoBar
+                        x:Name="UpdateInfoBar"
+                        IsClosable="True"
+                        IsOpen="False"
+                        Severity="Informational" />
 
-                <Button
-                    x:Name="InstallUpdateButton"
-                    Click="InstallUpdate_Click"
-                    Content="Install update"
-                    Style="{StaticResource AccentButtonStyle}"
-                    Visibility="Collapsed" />
-            </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button x:Name="CheckUpdatesButton"
+                                Click="CheckUpdates_Click"
+                                Content="Check for updates" />
 
-            <ProgressBar
-                x:Name="UpdateProgressBar"
-                Maximum="100"
-                Visibility="Collapsed"
-                Margin="0,4,0,0" />
+                        <Button x:Name="InstallUpdateButton"
+                                Click="InstallUpdate_Click"
+                                Content="Install update"
+                                Style="{StaticResource AccentButtonStyle}"
+                                Visibility="Collapsed" />
+                    </StackPanel>
 
-            <TextBlock
-                x:Name="UpdateProgressText"
-                FontSize="12"
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                Visibility="Collapsed" />
+                    <ProgressBar
+                        x:Name="UpdateProgressBar"
+                        Maximum="100"
+                        Visibility="Collapsed"
+                        Margin="0,4,0,0" />
+
+                    <TextBlock
+                        x:Name="UpdateProgressText"
+                        FontSize="12"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Visibility="Collapsed" />
+                </StackPanel>
+            </Border>
 
         </StackPanel>
     </ScrollViewer>

@@ -25,11 +25,37 @@ internal sealed class UpdateService
         get
         {
             var v = Assembly.GetExecutingAssembly().GetName().Version ?? new Version(1, 0, 0);
-            return new Version(v.Major, v.Minor, v.Build < 0 ? 0 : v.Build);
+            return NormalizeVersion(v);
         }
     }
 
-    internal static string CurrentVersionString => CurrentVersion.ToString(3);
+    internal static string CurrentVersionString
+    {
+        get
+        {
+            // Try to get the version from the Entry assembly (the .exe) or the Executing assembly (this DLL).
+            var assembly = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
+            
+            // InformationalVersion mirrors <Version> from the csproj exactly.
+            var info = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+                ?.InformationalVersion;
+
+            // Strip the "+commit-hash" suffix.
+            if (!string.IsNullOrEmpty(info))
+            {
+                var plus = info.IndexOf('+');
+                return plus > 0 ? info[..plus] : info;
+            }
+
+            // Fallback to name-based version if the attribute is missing.
+            var v = assembly.GetName().Version ?? new Version(1, 0, 0);
+            return NormalizeVersion(v).ToString(3);
+        }
+    }
+
+    /// <summary>Ensures Major, Minor, and Build are all ≥ 0 so <c>ToString(3)</c> never throws.</summary>
+    private static Version NormalizeVersion(Version v)
+        => new(v.Major, v.Minor, v.Build < 0 ? 0 : v.Build);
 
     // ── Check for update ──────────────────────────────────────────────────────
 
@@ -57,8 +83,10 @@ internal sealed class UpdateService
                 return null;
 
             var raw = release.TagName.TrimStart('v', 'V');
-            if (!Version.TryParse(raw, out var latest))
+            if (!Version.TryParse(raw, out var parsedLatest))
                 return null;
+
+            var latest = NormalizeVersion(parsedLatest);
 
             var exeAsset = release.Assets?.FirstOrDefault(a =>
                 string.Equals(a.Name, ExeAssetName, StringComparison.OrdinalIgnoreCase));
