@@ -82,9 +82,22 @@ function Get-RunningProcesses {
 function Get-LatestRelease {
     if ($script:Latest) { return $script:Latest }
     try {
+        Write-Step "Fetching latest release from GitHub API"
         $script:Latest = Invoke-RestMethod "https://api.github.com/repos/$Repo/releases/latest" -Headers $script:Headers
+
+        # Debugging output to inspect the API response
+        if (-not $script:Latest) {
+            Write-Warn "GitHub API returned no data. Check your connection or repository name."
+            return $null
+        }
+        if (-not $script:Latest.assets) {
+            Write-Warn "GitHub API response does not contain 'assets'. Response: $($script:Latest | ConvertTo-Json -Depth 3)"
+            return $null
+        }
+
         return $script:Latest
     } catch {
+        Write-Fail "Failed to fetch latest release: $($_.Exception.Message)"
         return $null
     }
 }
