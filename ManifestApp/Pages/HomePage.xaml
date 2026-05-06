@@ -41,7 +41,7 @@
             <StackPanel Spacing="16">
 
                 <!-- ──────── HERO ──────── -->
-                <Border CornerRadius="20" Padding="36,32,36,32"
+                <Border CornerRadius="20" Padding="24,20,24,20"
                         BorderThickness="1" BorderBrush="#1FB8C8FF">
                     <Border.Background>
                         <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
@@ -51,30 +51,30 @@
                         </LinearGradientBrush>
                     </Border.Background>
 
-                    <StackPanel Spacing="22">
+                    <StackPanel Spacing="12">
 
                         <!-- Status pill -->
-                        <Border CornerRadius="999" Padding="12,5,16,5"
+                        <Border CornerRadius="999" Padding="10,4,14,4"
                                 BorderThickness="1" BorderBrush="#506E45FF"
                                 Background="#1F6E45FF"
                                 HorizontalAlignment="Left">
-                            <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
-                                <Ellipse x:Name="StatusDot" Width="8" Height="8" Fill="#FF8B65FF" />
+                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <Ellipse x:Name="StatusDot" Width="6" Height="6" Fill="#FF8B65FF" />
                                 <TextBlock Text="MANIFEST HUB ACTIVE"
-                                           FontSize="11" FontWeight="SemiBold"
+                                           FontSize="10" FontWeight="SemiBold"
                                            Foreground="#FFB8C8FF"
-                                           CharacterSpacing="160" />
+                                           CharacterSpacing="120" />
                             </StackPanel>
                         </Border>
 
                         <!-- Eyebrow + gradient title -->
-                        <StackPanel Spacing="2">
+                        <StackPanel Spacing="0">
                             <TextBlock Text="GAMEGEN"
-                                       FontSize="13" FontWeight="SemiBold"
+                                       FontSize="11" FontWeight="SemiBold"
                                        Foreground="#809FB7FF"
-                                       CharacterSpacing="240" />
-                            <TextBlock FontSize="56" FontWeight="Bold"
-                                       LineHeight="62" CharacterSpacing="-20"
+                                       CharacterSpacing="200" />
+                            <TextBlock FontSize="42" FontWeight="Bold"
+                                       LineHeight="48" CharacterSpacing="-10"
                                        Text="MANIFEST HUB">
                                 <TextBlock.Foreground>
                                     <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
@@ -88,7 +88,7 @@
                         <!-- Description (HomeIntroText is rewritten by code-behind per source) -->
                         <TextBlock x:Name="HomeIntroText"
                                    Foreground="#C0EDEDF5"
-                                   FontSize="14" LineHeight="22"
+                                   FontSize="12" LineHeight="18"
                                    MaxWidth="640"
                                    HorizontalAlignment="Left"
                                    TextWrapping="WrapWholeWords"
@@ -98,27 +98,27 @@
                         <StackPanel Orientation="Horizontal" Spacing="10">
                             <Button Click="SearchStore_Click"
                                     Style="{StaticResource AccentButtonStyle}"
-                                    Padding="20,11,20,11">
-                                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                    <FontIcon Glyph="&#xE721;" FontSize="14" />
-                                    <TextBlock Text="SEARCH STORE"
-                                               FontWeight="SemiBold" CharacterSpacing="80" />
+                                    Padding="16,8,16,8">
+                                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                    <FontIcon Glyph="&#xE721;" FontSize="12" />
+                                    <TextBlock Text="SEARCH STORE" FontSize="12"
+                                               FontWeight="SemiBold" CharacterSpacing="60" />
                                 </StackPanel>
                             </Button>
                         </StackPanel>
 
                         <!-- Stats row -->
-                        <Grid ColumnSpacing="44" Margin="0,8,0,0">
+                        <Grid ColumnSpacing="32" Margin="0,4,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
-                            <StackPanel Grid.Column="0" Spacing="2">
+                            <StackPanel Grid.Column="0" Spacing="0">
                                 <TextBlock x:Name="StatTitlesValue"
                                            Text="0"
-                                           FontSize="32" FontWeight="Bold" LineHeight="36">
+                                           FontSize="26" FontWeight="Bold" LineHeight="30">
                                     <TextBlock.Foreground>
                                         <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
                                             <GradientStop Color="#FF8B65FF" Offset="0" />
@@ -127,14 +127,14 @@
                                     </TextBlock.Foreground>
                                 </TextBlock>
                                 <TextBlock Text="TITLES"
-                                           FontSize="11" FontWeight="SemiBold"
+                                           FontSize="10" FontWeight="SemiBold"
                                            Foreground="#80AFAFC4"
-                                           CharacterSpacing="200" />
+                                           CharacterSpacing="160" />
                             </StackPanel>
 
-                            <StackPanel Grid.Column="1" Spacing="2">
+                            <StackPanel Grid.Column="1" Spacing="0">
                                 <TextBlock Text="STEAM"
-                                           FontSize="32" FontWeight="Bold" LineHeight="36">
+                                           FontSize="26" FontWeight="Bold" LineHeight="30">
                                     <TextBlock.Foreground>
                                         <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
                                             <GradientStop Color="#FF8B65FF" Offset="0" />
@@ -143,14 +143,14 @@
                                     </TextBlock.Foreground>
                                 </TextBlock>
                                 <TextBlock Text="STORE SYNC"
-                                           FontSize="11" FontWeight="SemiBold"
+                                           FontSize="10" FontWeight="SemiBold"
                                            Foreground="#80AFAFC4"
-                                           CharacterSpacing="200" />
+                                           CharacterSpacing="160" />
                             </StackPanel>
 
-                            <StackPanel Grid.Column="2" Spacing="2">
+                            <StackPanel Grid.Column="2" Spacing="0">
                                 <TextBlock Text="GAMEGEN"
-                                           FontSize="32" FontWeight="Bold" LineHeight="36">
+                                           FontSize="26" FontWeight="Bold" LineHeight="30">
                                     <TextBlock.Foreground>
                                         <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
                                             <GradientStop Color="#FF8B65FF" Offset="0" />
@@ -159,69 +159,69 @@
                                     </TextBlock.Foreground>
                                 </TextBlock>
                                 <TextBlock Text="POWERED BY"
-                                           FontSize="11" FontWeight="SemiBold"
+                                           FontSize="10" FontWeight="SemiBold"
                                            Foreground="#80AFAFC4"
-                                           CharacterSpacing="200" />
+                                           CharacterSpacing="160" />
                             </StackPanel>
                         </Grid>
 
                         <!-- Feature cards row -->
-                        <Grid ColumnSpacing="12" Margin="0,8,0,0">
+                        <Grid ColumnSpacing="8" Margin="0,4,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
 
-                            <Border Grid.Column="0" CornerRadius="12" Padding="16,14,16,14"
+                            <Border Grid.Column="0" CornerRadius="10" Padding="12,10,12,10"
                                     BorderThickness="1" BorderBrush="#306E45FF"
                                     Background="#106E45FF">
-                                <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                                    <FontIcon Glyph="&#xE721;" FontSize="20"
+                                <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                    <FontIcon Glyph="&#xE721;" FontSize="16"
                                               Foreground="#FF8B65FF" VerticalAlignment="Center" />
                                     <StackPanel VerticalAlignment="Center">
                                         <TextBlock Text="STORE SEARCH"
-                                                   FontSize="12" FontWeight="SemiBold"
+                                                   FontSize="11" FontWeight="SemiBold"
                                                    Foreground="#FF8B65FF"
-                                                   CharacterSpacing="120" />
+                                                   CharacterSpacing="100" />
                                         <TextBlock Text="Steam catalog lookup"
-                                                   FontSize="11" Opacity="0.65"
+                                                   FontSize="10" Opacity="0.65"
                                                    Foreground="#FFEDEDF5" />
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
 
-                            <Border Grid.Column="1" CornerRadius="12" Padding="16,14,16,14"
+                            <Border Grid.Column="1" CornerRadius="10" Padding="12,10,12,10"
                                     BorderThickness="1" BorderBrush="#303B6BFF"
                                     Background="#103B6BFF">
-                                <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                                    <FontIcon Glyph="&#xE8AB;" FontSize="20"
+                                <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                    <FontIcon Glyph="&#xE8AB;" FontSize="16"
                                               Foreground="#FF5B7FFF" VerticalAlignment="Center" />
                                     <StackPanel VerticalAlignment="Center">
                                         <TextBlock Text="INSTALLED"
-                                                   FontSize="12" FontWeight="SemiBold"
+                                                   FontSize="11" FontWeight="SemiBold"
                                                    Foreground="#FF5B7FFF"
-                                                   CharacterSpacing="120" />
+                                                   CharacterSpacing="100" />
                                         <TextBlock Text="Local appmanifest scan"
-                                                   FontSize="11" Opacity="0.65"
+                                                   FontSize="10" Opacity="0.65"
                                                    Foreground="#FFEDEDF5" />
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
 
-                            <Border Grid.Column="2" CornerRadius="12" Padding="16,14,16,14"
+                            <Border Grid.Column="2" CornerRadius="10" Padding="12,10,12,10"
                                     BorderThickness="1" BorderBrush="#307DD3A0"
                                     Background="#107DD3A0">
-                                <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                                    <FontIcon Glyph="&#xE8F1;" FontSize="20"
+                                <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                    <FontIcon Glyph="&#xE8F1;" FontSize="16"
                                               Foreground="#FF7DD3A0" VerticalAlignment="Center" />
                                     <StackPanel VerticalAlignment="Center">
                                         <TextBlock Text="LIBRARY"
-                                                   FontSize="12" FontWeight="SemiBold"
+                                                   FontSize="11" FontWeight="SemiBold"
                                                    Foreground="#FF7DD3A0"
-                                                   CharacterSpacing="120" />
+                                                   CharacterSpacing="100" />
                                         <TextBlock Text="Tracked manifests"
-                                                   FontSize="11" Opacity="0.65"
+                                                   FontSize="10" Opacity="0.65"
                                                    Foreground="#FFEDEDF5" />
                                     </StackPanel>
                                 </StackPanel>
@@ -242,12 +242,12 @@
 
                 <!-- ──────── SOURCE / SEARCH CARD ──────── -->
                 <Border
-                    Padding="{StaticResource ManifestCardPadding}"
+                    Padding="16,12,16,12"
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                     BorderThickness="1"
                     CornerRadius="{StaticResource ManifestCardCornerRadius}">
-                    <StackPanel Spacing="12">
+                    <StackPanel Spacing="8">
                         <TextBlock
                             FontSize="12" FontWeight="SemiBold"
                             CharacterSpacing="160"
@@ -261,30 +261,30 @@
                             SelectionChanged="SourceCombo_SelectionChanged">
 
                             <ComboBoxItem Tag="store">
-                                <StackPanel MinHeight="32" Orientation="Horizontal" Spacing="10">
+                                <StackPanel MinHeight="26" Orientation="Horizontal" Spacing="8">
                                     <FontIcon Margin="0,2,0,0" VerticalAlignment="Center"
-                                              FontSize="16" Glyph="&#xE721;" />
-                                    <TextBlock VerticalAlignment="Center"
+                                              FontSize="14" Glyph="&#xE721;" />
+                                    <TextBlock VerticalAlignment="Center" FontSize="12"
                                                Text="Steam Store search (name → storefront App ID)"
                                                TextWrapping="NoWrap" />
                                 </StackPanel>
                             </ComboBoxItem>
 
                             <ComboBoxItem Tag="installed">
-                                <StackPanel MinHeight="32" Orientation="Horizontal" Spacing="10">
+                                <StackPanel MinHeight="26" Orientation="Horizontal" Spacing="8">
                                     <FontIcon Margin="0,2,0,0" VerticalAlignment="Center"
-                                              FontSize="16" Glyph="&#xE8AB;" />
-                                    <TextBlock VerticalAlignment="Center"
+                                              FontSize="14" Glyph="&#xE8AB;" />
+                                    <TextBlock VerticalAlignment="Center" FontSize="12"
                                                Text="Installed Steam games on this PC (appmanifest *.acf)"
                                                TextWrapping="NoWrap" />
                                 </StackPanel>
                             </ComboBoxItem>
 
                             <ComboBoxItem Tag="library">
-                                <StackPanel MinHeight="32" Orientation="Horizontal" Spacing="10">
+                                <StackPanel MinHeight="26" Orientation="Horizontal" Spacing="8">
                                     <FontIcon Margin="0,2,0,0" VerticalAlignment="Center"
-                                              FontSize="16" Glyph="&#xE8F1;" />
-                                    <TextBlock VerticalAlignment="Center"
+                                              FontSize="14" Glyph="&#xE8F1;" />
+                                    <TextBlock VerticalAlignment="Center" FontSize="12"
                                                Text="Manifest library (installed via this app, for removal)"
                                                TextWrapping="NoWrap" />
                                 </StackPanel>
@@ -340,16 +340,16 @@
                 <GridView.ItemTemplate>
                     <DataTemplate x:DataType="local:GameRowVm">
                         <Border
-                            Width="244"
+                            Width="200"
                             Margin="0,0,0,0"
-                            Padding="10,10,10,12"
+                            Padding="8,8,8,10"
                             Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                             BorderThickness="1"
                             CornerRadius="{StaticResource ManifestCardCornerRadius}">
-                            <StackPanel Spacing="10">
+                            <StackPanel Spacing="8">
 
-                                <Border Height="112" CornerRadius="8"
+                                <Border Height="90" CornerRadius="8"
                                         Background="{ThemeResource LayerFillColorDefaultBrush}">
                                     <Grid>
                                         <Image Stretch="UniformToFill">
@@ -404,11 +404,11 @@
             <Border
                 x:Name="DetailPanel"
                 Grid.Column="1"
-                MinWidth="260"
-                MaxWidth="308"
-                Width="288"
+                MinWidth="280"
+                MaxWidth="340"
+                Width="320"
                 VerticalAlignment="Stretch"
-                Padding="12,10"
+                Padding="16,14"
                 Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                 BorderThickness="1"
@@ -446,24 +446,24 @@
                         <StackPanel
                             x:Name="DetailActionsRow"
                             Orientation="Horizontal"
-                            Spacing="10">
+                            Spacing="8">
                             <Button
                                 x:Name="InstallButton"
-                                MinWidth="140"
+                                MinWidth="150" MinHeight="40"
                                 Click="Install_Click"
                                 Content="Install manifests"
                                 Style="{StaticResource AccentButtonStyle}" />
 
                             <Button
                                 x:Name="RemoveButton"
-                                MinWidth="120"
+                                MinWidth="130" MinHeight="40"
                                 Click="Remove_Click"
                                 Content="Remove files" />
                         </StackPanel>
 
                         <Button
                             x:Name="LaunchSteamButton"
-                            MinWidth="140"
+                            HorizontalAlignment="Stretch" MinHeight="40"
                             Click="LaunchSteam_Click"
                             Content="Launch in Steam"
                             Visibility="Collapsed" />
@@ -476,9 +476,11 @@
                                        Foreground="{StaticResource GameGenAccentGradientBrush}" />
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <Button x:Name="SteamInstallButton"
+                                        MinWidth="140" MinHeight="36"
                                         Click="SteamInstall_Click"
                                         Content="Install via Steam" />
                                 <Button x:Name="SteamUninstallButton"
+                                        MinWidth="130" MinHeight="36"
                                         Click="SteamUninstall_Click"
                                         Content="Uninstall via Steam" />
                             </StackPanel>

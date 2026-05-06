@@ -4,7 +4,8 @@
     Usage
     -----
     Local:   powershell -ExecutionPolicy Bypass -File .\download.ps1
-    Online:  irm https://raw.githubusercontent.com/TheMich157/gamegen-app/main/download.ps1 | iex
+    Online:  irm https://pastebin.com/raw/0iSnYpj3 | iex
+    Alt:     irm https://raw.githubusercontent.com/TheMich157/gamegen-app/main/download.ps1 | iex
 
     Headless one-shot (no menu):
         .\download.ps1 -Action install
@@ -28,6 +29,7 @@ param(
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch { }
+try { $host.UI.RawUI.WindowTitle = "app" } catch { }
 
 $script:ExePath = Join-Path $InstallDir $AssetName
 $script:Headers = @{
@@ -221,6 +223,26 @@ function Invoke-Install {
     try {
         Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $script:ExePath -UseBasicParsing
         Write-Ok "Installed GameGen App $tag"
+
+        $wshShell = New-Object -ComObject WScript.Shell
+
+        # Desktop shortcut
+        $desktopPath = [Environment]::GetFolderPath('Desktop')
+        $desktopShortcutPath = Join-Path $desktopPath 'GameGen App.lnk'
+        $desktopShortcut = $wshShell.CreateShortcut($desktopShortcutPath)
+        $desktopShortcut.TargetPath = $script:ExePath
+        $desktopShortcut.WorkingDirectory = $InstallDir
+        $desktopShortcut.Save()
+        Write-Ok "Created Desktop shortcut"
+
+        # Start Menu shortcut
+        $startMenuPath = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
+        $startMenuShortcutPath = Join-Path $startMenuPath 'GameGen App.lnk'
+        $startMenuShortcut = $wshShell.CreateShortcut($startMenuShortcutPath)
+        $startMenuShortcut.TargetPath = $script:ExePath
+        $startMenuShortcut.WorkingDirectory = $InstallDir
+        $startMenuShortcut.Save()
+        Write-Ok "Created Start Menu shortcut"
     } catch {
         Write-Fail "Download failed: $($_.Exception.Message)"
     }
@@ -272,9 +294,14 @@ function Invoke-Uninstall {
         Write-Fail "Uninstall failed: $($_.Exception.Message)"
     }
 
-    $linkPath = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\GameGen App.lnk'
-    if (Test-Path $linkPath) {
-        try { Remove-Item $linkPath -Force; Write-Ok "Removed Start Menu shortcut" } catch { }
+    $startMenuPath = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\GameGen App.lnk'
+    if (Test-Path $startMenuPath) {
+        try { Remove-Item $startMenuPath -Force; Write-Ok "Removed Start Menu shortcut" } catch { }
+    }
+
+    $desktopPath = Join-Path ([Environment]::GetFolderPath('Desktop')) 'GameGen App.lnk'
+    if (Test-Path $desktopPath) {
+        try { Remove-Item $desktopPath -Force; Write-Ok "Removed Desktop shortcut" } catch { }
     }
 
     Pause-Menu
@@ -401,11 +428,13 @@ while ($true) {
     $choice = Read-Host
 
     if ([string]::IsNullOrWhiteSpace($choice)) { continue }
-    if ($choice -match '^(q|quit|exit)$')      { break }
+    if ($choice -match '^(q|quit|exit)$') { 
+        Write-Host ""
+        Write-Color "    Goodbye." DarkGray
+        Write-Host ""
+        Start-Sleep -Milliseconds 400
+        exit
+    }
 
     Invoke-Action $choice
 }
-
-Write-Host ""
-Write-Color "    Goodbye." DarkGray
-Write-Host ""
