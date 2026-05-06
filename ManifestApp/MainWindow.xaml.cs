@@ -5,16 +5,17 @@ using Microsoft.UI.Xaml.Navigation;
 using ManifestApp.Pages;
 using ManifestApp.Services;
 using Windows.UI;
-using System.Media;
 
 namespace ManifestApp;
 
 public sealed partial class MainWindow : Window
 {
     private TrayIconService? _trayIcon;
-    private bool             _reallyClosing;
     private bool             _splashStarted;
     private DispatcherTimer? _bgUpdateTimer;
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool MessageBeep(uint uType);
 
     public MainWindow()
     {
@@ -31,7 +32,6 @@ public sealed partial class MainWindow : Window
             onCheckUpdates: OpenSettingsForUpdates,
             onExit: () =>
             {
-                _reallyClosing = true;
                 Close();
             });
 
@@ -61,7 +61,7 @@ public sealed partial class MainWindow : Window
             svcs.StartupUpdateResult = result;
             GlobalUpdateNotification.Message = $"Version {result.LatestVersion} is available.";
             GlobalUpdateNotification.IsOpen = true;
-            try { SystemSounds.Exclamation.Play(); } catch { }
+            try { MessageBeep(0x30); /* MB_ICONEXCLAMATION */ } catch { }
         }
     }
 
