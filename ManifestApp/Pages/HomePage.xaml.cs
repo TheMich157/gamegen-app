@@ -556,18 +556,7 @@ public sealed partial class HomePage : Page
         else
             sb.AppendLine("Not tracked — Install adds plugin/depot files from GameGen.");
 
-        if (sel.TrackedDeployedPaths is { Count: > 0 } paths)
-        {
-            sb.AppendLine();
-            sb.AppendLine("Deployed files");
-            const int maxLines = 25;
-            var n = Math.Min(paths.Count, maxLines);
-            for (var i = 0; i < n; i++)
-                sb.AppendLine(" • " + paths[i]);
 
-            if (paths.Count > maxLines)
-                sb.AppendLine($"… and {paths.Count - maxLines} more.");
-        }
 
         if (!string.IsNullOrEmpty(sel.ZipFingerprintPrefix))
         {

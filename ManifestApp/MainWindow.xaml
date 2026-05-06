@@ -65,6 +65,22 @@
                 <Frame x:Name="OnboardingFrame" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
             </Grid>
 
+            <InfoBar
+                x:Name="GlobalUpdateNotification"
+                Title="Update Available!"
+                Severity="Success"
+                IsOpen="False"
+                IsClosable="True"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Bottom"
+                Margin="24"
+                CornerRadius="8"
+                MaxWidth="350">
+                <InfoBar.ActionButton>
+                    <Button Content="Install Now" Click="GlobalUpdateNotification_InstallClick" />
+                </InfoBar.ActionButton>
+            </InfoBar>
+
             <!-- Startup splash; sits on top of NavigationView and OnboardingHost until init completes. -->
             <Grid x:Name="SplashHost" IsHitTestVisible="True">
                 <pages:SplashOverlay x:Name="Splash" />

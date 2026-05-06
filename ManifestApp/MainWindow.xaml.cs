@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Navigation;
 using ManifestApp.Pages;
 using ManifestApp.Services;
 using Windows.UI;
+using System.Media;
 
 namespace ManifestApp;
 
@@ -13,6 +14,7 @@ public sealed partial class MainWindow : Window
     private TrayIconService? _trayIcon;
     private bool             _reallyClosing;
     private bool             _splashStarted;
+    private DispatcherTimer? _bgUpdateTimer;
 
     public MainWindow()
     {
@@ -43,6 +45,37 @@ public sealed partial class MainWindow : Window
         RootChrome.ActualThemeChanged += (_, _) => SyncCaptionButtonColors();
         RootChrome.Loaded += (_, _) => SyncCaptionButtonColors();
         Activated += MainWindow_Activated;
+
+        // Start background update checker
+        _bgUpdateTimer = new DispatcherTimer { Interval = TimeSpan.FromHours(1) };
+        _bgUpdateTimer.Tick += BgUpdateTimer_Tick;
+        _bgUpdateTimer.Start();
+    }
+
+    private async void BgUpdateTimer_Tick(object? sender, object e)
+    {
+        var svcs = ((App)Application.Current).Svcs;
+        var result = await svcs.UpdateChecker.CheckAsync();
+        if (result?.IsUpdateAvailable == true && !GlobalUpdateNotification.IsOpen)
+        {
+            svcs.StartupUpdateResult = result;
+            GlobalUpdateNotification.Message = $"Version {result.LatestVersion} is available.";
+            GlobalUpdateNotification.IsOpen = true;
+            try { SystemSounds.Exclamation.Play(); } catch { }
+        }
+    }
+
+    private async void GlobalUpdateNotification_InstallClick(object sender, RoutedEventArgs e)
+    {
+        GlobalUpdateNotification.IsOpen = false;
+        var svcs = ((App)Application.Current).Svcs;
+        var result = svcs.StartupUpdateResult;
+        if (result?.ExeDownloadUrl != null)
+        {
+            var batPath = await svcs.UpdateChecker.DownloadUpdateAsync(result.ExeDownloadUrl);
+            if (batPath != null)
+                UpdateService.ApplyUpdate(batPath);
+        }
     }
 
     private void MainWindow_Activated(object sender, WindowActivatedEventArgs e)
@@ -76,7 +109,22 @@ public sealed partial class MainWindow : Window
             await Task.WhenAll(updateTask, Task.Delay(700));
             var result = await updateTask;
             if (result?.IsUpdateAvailable == true)
+            {
                 svcs.StartupUpdateResult = result;
+
+                if (!string.IsNullOrEmpty(result.ExeDownloadUrl))
+                {
+                    Splash.SetStep(SplashOverlay.SplashStep.CheckUpdates, SplashOverlay.StepState.Active, $"Downloading update v{result.LatestVersion}...");
+                    var batPath = await svcs.UpdateChecker.DownloadUpdateAsync(result.ExeDownloadUrl);
+                    if (batPath != null)
+                    {
+                        Splash.SetStep(SplashOverlay.SplashStep.CheckUpdates, SplashOverlay.StepState.Done, "Installing update...");
+                        await Task.Delay(500);
+                        UpdateService.ApplyUpdate(batPath);
+                        return; // App will restart
+                    }
+                }
+            }
 
             Splash.SetStep(SplashOverlay.SplashStep.CheckUpdates, SplashOverlay.StepState.Done,
                 result?.IsUpdateAvailable == true
@@ -112,18 +160,10 @@ public sealed partial class MainWindow : Window
 
     private void OnAppWindowClosing(AppWindow sender, AppWindowClosingEventArgs e)
     {
-        if (_reallyClosing)
-        {
-            // Real exit: clean up tray and Discord
-            _trayIcon?.Dispose();
-            _trayIcon = null;
-            try { ((App)Application.Current).Svcs.DiscordPresence.Dispose(); } catch { /* ignore */ }
-            return;
-        }
-
-        // Hide to tray instead of closing
-        e.Cancel = true;
-        sender.Hide();
+        // Real exit: clean up tray and Discord
+        _trayIcon?.Dispose();
+        _trayIcon = null;
+        try { ((App)Application.Current).Svcs.DiscordPresence.Dispose(); } catch { /* ignore */ }
     }
 
     private void ShowFromTray()
