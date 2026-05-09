@@ -256,7 +256,142 @@ public sealed class GameGenApiClient(HttpClient http, SettingsStore settingsStor
             : $"{(int)rsp.StatusCode} {rsp.ReasonPhrase}";
 
     private static bool LooksLikeZip(IReadOnlyList<byte> data) =>
-        data.Count >= 2 && data[0] == 'P' && data[1] == 'K';
+        data.Count >= 4 &&
+        data[0] == 0x50 && data[1] == 0x4B &&   // 'P','K'
+        data[2] == 0x03 && data[3] == 0x04;      // local-file header signature
+
+    // ── Game Request ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// POST /api/{key}/request/{appId} — formally requests a game be added to the GameGen registry.
+    /// </summary>
+    public async Task<GameGenRequestResult> RequestGameAsync(
+        string apiKey, uint appId, string? reason, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(apiKey))
+            return GameGenRequestResult.Fail("API key is missing.");
+
+        var keySeg = Uri.EscapeDataString(apiKey.Trim());
+        var url    = $"{GetApiRoot().TrimEnd('/')}/api/{keySeg}/request/{appId}";
+
+        try
+        {
+            var payload = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                reason = string.IsNullOrWhiteSpace(reason) ? (string?)null : reason.Trim(),
+            });
+
+            using var req = new HttpRequestMessage(HttpMethod.Post, url)
+            {
+                Content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json"),
+            };
+            using var rsp = await http.SendAsync(req, ct).ConfigureAwait(false);
+            var raw = await rsp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+
+            using var doc = System.Text.Json.JsonDocument.Parse(raw);
+            var root      = doc.RootElement;
+            var status    = root.TryGetProperty("status",   out var st) ? st.GetString() : null;
+            var gameName  = root.TryGetProperty("gameName", out var gn) ? gn.GetString() : null;
+            var appIdStr  = root.TryGetProperty("appId",    out var ai) ? ai.GetString() : appId.ToString();
+            var error     = root.TryGetProperty("error",    out var er) ? er.GetString() : null;
+
+            return status == "sent"
+                ? GameGenRequestResult.Success(appIdStr, gameName)
+                : GameGenRequestResult.Fail(error ?? $"Request not sent (status: {status ?? "unknown"}).");
+        }
+        catch (Exception ex)
+        {
+            return GameGenRequestResult.Fail($"Network error: {ex.Message}");
+        }
+    }
+
+    // ── Stats ─────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// GET /api/{key}/stats — plan status and remaining daily credits.
+    /// </summary>
+    public async Task<GameGenStatsResult> GetStatsAsync(string apiKey, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(apiKey))
+            return new GameGenStatsResult { Ok = false, ErrorMessage = "No API key." };
+
+        var keySeg = Uri.EscapeDataString(apiKey.Trim());
+        var url    = $"{GetApiRoot().TrimEnd('/')}/api/{keySeg}/stats";
+
+        try
+        {
+            using var rsp = await http.GetAsync(url, ct).ConfigureAwait(false);
+            var raw = await rsp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+
+            if (!rsp.IsSuccessStatusCode)
+                return new GameGenStatsResult { Ok = false, ErrorMessage = $"HTTP {(int)rsp.StatusCode}" };
+
+            using var doc = System.Text.Json.JsonDocument.Parse(raw);
+            var root = doc.RootElement;
+
+            string? plan = null, displayName = null, discordId = null;
+            int? creditsRemaining = null, creditsTotal = null;
+
+            if (root.TryGetProperty("plan", out var p)) plan = p.GetString();
+
+            // Try every field name the GameGen API might use for the Discord account.
+            // Prefer human-readable display names; fall back to username/tag/email.
+            foreach (var field in new[]
+            {
+                "discordUsername", "discord_username", "discordName", "discord_name",
+                "discordTag",      "discord_tag",
+                "displayName",     "display_name",
+                "globalName",      "global_name",
+                "username",        "name",
+                "email",
+            })
+            {
+                if (root.TryGetProperty(field, out var v) &&
+                    v.ValueKind == System.Text.Json.JsonValueKind.String)
+                {
+                    displayName = v.GetString();
+                    if (!string.IsNullOrWhiteSpace(displayName)) break;
+                }
+            }
+
+            // Also capture the raw Discord snowflake ID so the UI can fall back to it.
+            foreach (var field in new[] { "discordId", "discord_id", "discordUserId", "discord_user_id" })
+            {
+                if (root.TryGetProperty(field, out var v) &&
+                    v.ValueKind == System.Text.Json.JsonValueKind.String)
+                {
+                    discordId = v.GetString();
+                    if (!string.IsNullOrWhiteSpace(discordId)) break;
+                }
+            }
+
+            foreach (var field in new[] { "creditsRemaining", "remaining", "credits", "dailyCreditsRemaining", "requestsRemaining" })
+            {
+                if (root.TryGetProperty(field, out var v) && v.TryGetInt32(out var i))
+                { creditsRemaining = i; break; }
+            }
+
+            foreach (var field in new[] { "creditsTotal", "dailyLimit", "totalCredits", "limit", "dailyCredits" })
+            {
+                if (root.TryGetProperty(field, out var v) && v.TryGetInt32(out var i))
+                { creditsTotal = i; break; }
+            }
+
+            return new GameGenStatsResult
+            {
+                Ok               = true,
+                Plan             = plan,
+                CreditsRemaining = creditsRemaining,
+                CreditsTotal     = creditsTotal,
+                DisplayName      = displayName,
+                DiscordId        = discordId,
+            };
+        }
+        catch (Exception ex)
+        {
+            return new GameGenStatsResult { Ok = false, ErrorMessage = ex.Message };
+        }
+    }
 }
 
 public sealed class GameGenZipResult(bool ok, byte[]? zipBytes, string? errorMessage)
@@ -266,6 +401,30 @@ public sealed class GameGenZipResult(bool ok, byte[]? zipBytes, string? errorMes
     public string? ErrorMessage { get; } = errorMessage;
 
     public static GameGenZipResult Successful(byte[] bytes) => new(true, bytes, null);
-
     public static GameGenZipResult Fail(string msg) => new(false, null, msg);
+}
+
+public sealed class GameGenRequestResult
+{
+    public bool    Sent         { get; init; }
+    public string? GameName     { get; init; }
+    public string? AppId        { get; init; }
+    public string? ErrorMessage { get; init; }
+
+    public static GameGenRequestResult Success(string? appId, string? gameName) =>
+        new() { Sent = true, AppId = appId, GameName = gameName };
+    public static GameGenRequestResult Fail(string msg) =>
+        new() { Sent = false, ErrorMessage = msg };
+}
+
+public sealed class GameGenStatsResult
+{
+    public bool    Ok               { get; init; }
+    public string? Plan             { get; init; }
+    public int?    CreditsRemaining { get; init; }
+    public int?    CreditsTotal     { get; init; }
+    public string? DisplayName      { get; init; }
+    /// <summary>Raw Discord snowflake ID — used as last-resort display when no human-readable name is available.</summary>
+    public string? DiscordId        { get; init; }
+    public string? ErrorMessage     { get; init; }
 }

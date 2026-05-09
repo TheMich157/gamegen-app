@@ -2,9 +2,11 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using ManifestApp.Core;
 using ManifestApp.Services;
+using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Navigation;
 using Microsoft.UI.Dispatching;
 
@@ -691,43 +693,12 @@ public sealed partial class HomePage : Page
         if (row is null || row.IsConfigured)
             return;
 
+        // Walk user through setup if API key or Steam paths are missing
+        if (!await RunSetupGuideAsync())
+            return;
+
         if (!await EnsureSteamToolsOrContinueAnywayAsync())
             return;
-
-        if (!GameGenApiKeyStore.TryRetrieve(out var apiKey) || string.IsNullOrWhiteSpace(apiKey))
-        {
-            DetailPanel.Visibility = Visibility.Visible;
-            DetailStatus.Text =
-                "Paste and save your GameGen API key (Settings → GameGen API). It is sent in the HTTPS path.";
-            await ShowInfoAsync(
-                "API key missing",
-                "Open Settings → GameGen API (Save endpoint & API key).\nYour key becomes the \"{yourKey}\" segment in:\n\nhttps://gamegen.lol/api/{yourKey}/generate/{steamAppId}");
-            return;
-        }
-
-        if (IsStoreSearchSource())
-        {
-            var installed = TryEvaluateLocalSteamInstallPresence(row.AppId, out var couldVerify);
-            if (!couldVerify)
-            {
-                DetailPanel.Visibility = Visibility.Visible;
-                DetailStatus.Text =
-                    "Steam paths aren’t set or detected — we can’t check whether this App ID is installed locally. Configure Settings.";
-            }
-            else if (!installed)
-            {
-                DetailStatus.Text =
-                    $"App ID {row.AppId} is not listed in your local Steam manifests — install/update it in Steam first.";
-                var proceedLocal = await ChooseContinueAnywayAsync(
-                    "Game not installed locally",
-                    $"\"{row.DisplayName}\" (App ID {row.AppId}) is not in your enumerated Steam libraries (no appmanifest match).\n\nDownload or repair the game through Steam unless you knowingly continue.",
-                    "Stop",
-                    "Continue anyway");
-
-                if (!proceedLocal)
-                    return;
-            }
-        }
 
         InstallButton.IsEnabled = false;
         SetInstallProgressIndeterminate("Fetching from GameGen...");
@@ -770,6 +741,12 @@ public sealed partial class HomePage : Page
                 InstallProgressText.Text = $"Downloading ZIP... {pct:0}%";
             });
 
+            if (!GameGenApiKeyStore.TryRetrieve(out var apiKey) || string.IsNullOrWhiteSpace(apiKey))
+            {
+                // RunSetupGuideAsync should have ensured a key exists, but guard defensively.
+                DetailStatus.Text = "API key missing — open Settings to add your GameGen key.";
+                return;
+            }
             var zipResult = await TypedApp.Svcs.GameGenApi
                 .DownloadGenerateZipAsync(apiKey.Trim(), row.AppId, CancellationToken.None, downloadProgress);
 
@@ -780,9 +757,15 @@ public sealed partial class HomePage : Page
                 var err = zipResult.ErrorMessage ??
                           "GameGen response could not be turned into manifest artifacts.";
                 DetailStatus.Text = err;
-                await ShowInfoAsync(
-                    "GameGen couldn’t fetch the ZIP",
-                    err + "\n\nConfirm your key, Steam App ID, and that GameGen has data for this title.");
+
+                // Check quota exhaustion first — show a specific daily-limit warning
+                // instead of the generic "request this game" dialog.
+                var (isQuotaExhausted, cachedStats) = await CheckQuotaAsync(err);
+                if (isQuotaExhausted)
+                    await ShowOutOfGenerationsDialogAsync(cachedStats);
+                else
+                    await OfferGameRequestAsync(row, err);
+
                 return;
             }
 
@@ -964,6 +947,465 @@ public sealed partial class HomePage : Page
         {
             DetailStatus.Text = $"Couldn't trigger {label}: {ex.Message}";
         }
+    }
+
+
+    // ── Daily generation limit detection & dialog ────────────────────────────
+
+    /// <summary>
+    /// Checks whether a generation failure is due to quota exhaustion.
+    /// Returns the quota verdict alongside any live <see cref="GameGenStatsResult"/> fetched,
+    /// so the caller can reuse it without a second API round-trip.
+    /// </summary>
+    private async Task<(bool IsExhausted, GameGenStatsResult? Stats)> CheckQuotaAsync(string errorMessage)
+    {
+        // Fast path: recognisable keywords in the error text
+        var msg = errorMessage.ToLowerInvariant();
+        bool keywordHit =
+            msg.Contains("limit")    || msg.Contains("credit")  ||
+            msg.Contains("quota")    || msg.Contains("daily")   ||
+            msg.Contains("exceeded") || msg.Contains("ran out") ||
+            msg.Contains("no more");   // removed "rate" — too broad
+
+        // Fetch live stats either way (needed for the dialog's plan/total display).
+        GameGenStatsResult? stats = null;
+        if (GameGenApiKeyStore.TryRetrieve(out var apiKey) &&
+            !string.IsNullOrWhiteSpace(apiKey))
+        {
+            try
+            {
+                stats = await TypedApp.Svcs.GameGenApi
+                    .GetStatsAsync(apiKey.Trim(), CancellationToken.None)
+                    .ConfigureAwait(true);
+            }
+            catch { /* best-effort */ }
+        }
+
+        // Stats win over keyword heuristic when available
+        if (stats?.Ok == true && stats.CreditsRemaining.HasValue)
+            return (stats.CreditsRemaining.Value <= 0, stats);
+
+        return (keywordHit, stats);
+    }
+
+    /// <summary>
+    /// Shows a targeted "daily limit reached" dialog that includes the user's
+    /// plan name and total daily allowance. Accepts pre-fetched stats so no
+    /// extra API call is needed.
+    /// </summary>
+    private async Task ShowOutOfGenerationsDialogAsync(GameGenStatsResult? stats)
+    {
+        string? plan  = stats?.Ok == true ? stats.Plan : null;
+        int?    total = stats?.Ok == true ? stats.CreditsTotal : null;
+
+        var planLabel = string.IsNullOrWhiteSpace(plan)
+            ? "Your plan"
+            : $"{char.ToUpperInvariant(plan[0])}{plan[1..]} plan";
+
+        var limitLine = total.HasValue
+            ? $"{planLabel} includes {total} generation{(total == 1 ? "" : "s")} per day."
+            : $"{planLabel} has a daily generation limit.";
+
+        var dlg = new ContentDialog
+        {
+            Title         = "Daily generation limit reached",
+            XamlRoot      = XamlRoot!,
+            CloseButtonText   = "OK",
+            DefaultButton = ContentDialogButton.Close,
+            Content       = new StackPanel
+            {
+                Spacing  = 12,
+                MaxWidth = 420,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text         = $"You've used all your available GameGen generations for today. {limitLine}",
+                        FontSize     = 13,
+                        TextWrapping = TextWrapping.WrapWholeWords,
+                    },
+                    new InfoBar
+                    {
+                        IsOpen    = true,
+                        IsClosable = false,
+                        Severity  = InfoBarSeverity.Warning,
+                        Title     = "Resets every 24 hours",
+                        Message   = "Your quota resets daily. Try again tomorrow, or upgrade your plan at gamegen.lol for a higher limit.",
+                    },
+                },
+            },
+        };
+
+        // Refresh the pane-footer credit count after showing the dialog
+        await dlg.ShowAsync();
+        if (TypedApp.MainShell is MainWindow mw)
+            await mw.RefreshUserStatsAsync().ConfigureAwait(true);
+    }
+
+    // ── Game-not-found request flow ───────────────────────────────────────────
+
+    /// <summary>
+    /// Called when GameGen fails to produce a ZIP for a game.
+    /// Shows a dialog explaining the error and offering to jump to the Requests tab
+    /// so the user can formally request the title be added to the registry.
+    /// </summary>
+    private async Task OfferGameRequestAsync(GameRowVm row, string errorMessage)
+    {
+        var dlg = new ContentDialog
+        {
+            Title   = "GameGen couldn't generate this title",
+            Content = new StackPanel
+            {
+                Spacing  = 12,
+                MaxWidth = 420,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text         = errorMessage,
+                        FontSize     = 13,
+                        TextWrapping = TextWrapping.WrapWholeWords,
+                        Foreground   = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+                    },
+                    new InfoBar
+                    {
+                        IsOpen      = true,
+                        IsClosable  = false,
+                        Severity    = InfoBarSeverity.Informational,
+                        Title       = "Game not in registry?",
+                        Message     = "If this title isn't in the GameGen registry yet, you can formally " +
+                                      "request it via the Requests tab. Your request goes straight to " +
+                                      "our fulfillment pipeline.",
+                    },
+                },
+            },
+            PrimaryButtonText   = "Go to Requests tab",
+            CloseButtonText     = "Close",
+            DefaultButton       = ContentDialogButton.Primary,
+            XamlRoot            = XamlRoot!,
+        };
+
+        var choice = await dlg.ShowAsync();
+        if (choice == ContentDialogResult.Primary &&
+            TypedApp.MainShell is MainWindow mw)
+        {
+            mw.NavigateToRequests(row.AppId, row.DisplayName);
+        }
+    }
+
+    // ── Setup guide wizard ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Shows a step-by-step setup guide if the API key or Steam path is not yet configured.
+    /// Returns true when the user is ready to proceed with the install, false when they cancel.
+    /// </summary>
+    private async Task<bool> RunSetupGuideAsync()
+    {
+        var hasApiKey = GameGenApiKeyStore.TryRetrieve(out _);
+        var hasSteam  = TypedApp.Svcs.PathsResolver.ResolveSteamInstall() is { Length: > 0 };
+
+        if (hasApiKey && hasSteam) return true;   // all good — skip the guide
+
+        // Build ordered step list (always starts with Welcome, ends with Ready)
+        var steps = new List<string> { "welcome" };
+        if (!hasApiKey) steps.Add("apikey");
+        if (!hasSteam)  steps.Add("steam");
+        steps.Add("ready");
+
+        int  cur  = 0;
+        bool done = false;
+
+        // Shared control references filled lazily inside the builders below
+        PasswordBox? apiKeyBox  = null;
+        TextBlock?   apiKeyHint = null;
+        TextBlock?   steamHint  = null;
+
+        // ── Step content builders ─────────────────────────────────────────────
+
+        UIElement BuildWelcome()
+        {
+            var sp = new StackPanel { Spacing = 12, MaxWidth = 400 };
+
+            sp.Children.Add(new FontIcon
+            {
+                Glyph = "",
+                FontSize = 36,
+                HorizontalAlignment = HorizontalAlignment.Left,
+            });
+
+            sp.Children.Add(new TextBlock
+            {
+                Text = "Let's get GameGen set up. Here's what we'll configure:",
+                FontSize = 14,
+                TextWrapping = TextWrapping.WrapWholeWords,
+            });
+
+            var bullets = new StackPanel { Spacing = 6, Margin = new Thickness(8, 0, 0, 0) };
+            if (!hasApiKey)
+                bullets.Children.Add(new TextBlock
+                {
+                    Text = "① Your GameGen API key — authenticates the manifest generation call",
+                    FontSize = 13,
+                    TextWrapping = TextWrapping.WrapWholeWords,
+                });
+            if (!hasSteam)
+                bullets.Children.Add(new TextBlock
+                {
+                    Text = "② Your Steam install path — so files deploy to the right folders",
+                    FontSize = 13,
+                    TextWrapping = TextWrapping.WrapWholeWords,
+                });
+            sp.Children.Add(bullets);
+
+            sp.Children.Add(new TextBlock
+            {
+                Text = "Click Next to walk through each step.",
+                FontSize = 13,
+                Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+                TextWrapping = TextWrapping.WrapWholeWords,
+            });
+            return sp;
+        }
+
+        UIElement BuildApiKey()
+        {
+            var sp = new StackPanel { Spacing = 10, MaxWidth = 400 };
+
+            sp.Children.Add(new TextBlock
+            {
+                Text = "Your GameGen API key is the {YOUR_KEY} segment in the generate URL:",
+                FontSize = 13,
+                TextWrapping = TextWrapping.WrapWholeWords,
+            });
+
+            sp.Children.Add(new TextBlock
+            {
+                Text = "https://gamegen.lol/api/{YOUR_KEY}/generate/{appId}",
+                FontSize = 11,
+                FontFamily = new FontFamily("Consolas"),
+                Foreground = (Brush)Application.Current.Resources["AccentTextFillColorPrimaryBrush"],
+                TextWrapping = TextWrapping.Wrap,
+            });
+
+            apiKeyBox = new PasswordBox
+            {
+                PlaceholderText = "Paste your API key here…",
+                Margin = new Thickness(0, 4, 0, 0),
+            };
+            sp.Children.Add(apiKeyBox);
+
+            apiKeyHint = new TextBlock
+            {
+                FontSize = 12,
+                Foreground = new SolidColorBrush(Colors.OrangeRed),
+                Visibility = Visibility.Collapsed,
+                TextWrapping = TextWrapping.WrapWholeWords,
+            };
+            sp.Children.Add(apiKeyHint);
+
+            sp.Children.Add(new TextBlock
+            {
+                Text = "You can find or regenerate your key at gamegen.lol.",
+                FontSize = 12,
+                Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+            });
+            return sp;
+        }
+
+        UIElement BuildSteam()
+        {
+            var sp = new StackPanel { Spacing = 10, MaxWidth = 400 };
+
+            sp.Children.Add(new TextBlock
+            {
+                Text = "GameGen deploys manifest files into Steam’s stplug-in and depotcache folders. We need your Steam install path to find them.",
+                FontSize = 13,
+                TextWrapping = TextWrapping.WrapWholeWords,
+            });
+
+            steamHint = new TextBlock
+            {
+                FontSize = 12,
+                TextWrapping = TextWrapping.WrapWholeWords,
+            };
+            var detected = TypedApp.Svcs.PathsResolver.ResolveSteamInstall();
+            if (detected is { Length: > 0 })
+            {
+                steamHint.Text       = $"✓  Steam detected at: {detected}";
+                steamHint.Foreground = new SolidColorBrush(Colors.LightGreen);
+            }
+            else
+            {
+                steamHint.Text       = "Steam path not detected yet. Click Auto-detect, or open Settings to set it manually.";
+                steamHint.Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
+            }
+
+            var autoBtn = new Button
+            {
+                Content = "Auto-detect Steam path",
+                Padding = new Thickness(14, 8, 14, 8),
+            };
+            autoBtn.Click += (_, _) =>
+            {
+                var found = TypedApp.Svcs.PathsResolver.ResolveSteamInstall();
+                if (found is { Length: > 0 })
+                {
+                    var s = TypedApp.Svcs.SettingsStore.Load();
+                    s.SteamInstallPathOverride = found;
+                    TypedApp.Svcs.SettingsStore.Save(s);
+                    steamHint!.Text      = $"✓  Saved: {found}";
+                    steamHint.Foreground = new SolidColorBrush(Colors.LightGreen);
+                }
+                else
+                {
+                    steamHint!.Text      = "⚠  Couldn't auto-detect. Open Settings → Steam paths to set it manually.";
+                    steamHint.Foreground = new SolidColorBrush(Colors.OrangeRed);
+                }
+            };
+            sp.Children.Add(autoBtn);
+            sp.Children.Add(steamHint);
+
+            var settingsLink = new HyperlinkButton
+            {
+                Content = "Open Settings to configure paths manually →",
+                Padding = new Thickness(0, 2, 0, 0),
+            };
+            settingsLink.Click += (_, _) =>
+            {
+                if (TypedApp.MainShell is MainWindow mw)
+                    mw.NavigateToSettings();
+            };
+            sp.Children.Add(settingsLink);
+            return sp;
+        }
+
+        UIElement BuildReady()
+        {
+            var sp = new StackPanel { Spacing = 10, MaxWidth = 400 };
+
+            sp.Children.Add(new FontIcon
+            {
+                Glyph      = "",
+                FontSize   = 36,
+                Foreground = new SolidColorBrush(Colors.LightGreen),
+                HorizontalAlignment = HorizontalAlignment.Left,
+            });
+
+            sp.Children.Add(new TextBlock
+            {
+                Text = "You’re all set! Click Generate to fetch the manifest from GameGen and deploy it to your Steam folders.",
+                FontSize = 14,
+                TextWrapping = TextWrapping.WrapWholeWords,
+            });
+
+            var summary = new StackPanel { Spacing = 4, Margin = new Thickness(0, 6, 0, 0) };
+            if (GameGenApiKeyStore.TryRetrieve(out _))
+                summary.Children.Add(new TextBlock
+                {
+                    Text       = "✓  GameGen API key configured",
+                    FontSize   = 13,
+                    Foreground = new SolidColorBrush(Colors.LightGreen),
+                });
+            var steam = TypedApp.Svcs.PathsResolver.ResolveSteamInstall();
+            if (steam is { Length: > 0 })
+                summary.Children.Add(new TextBlock
+                {
+                    Text         = $"✓  Steam: {steam}",
+                    FontSize     = 13,
+                    Foreground   = new SolidColorBrush(Colors.LightGreen),
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                });
+            sp.Children.Add(summary);
+            return sp;
+        }
+
+        // ── Step dispatch helpers ─────────────────────────────────────────────
+
+        UIElement BuildContent(int idx) => steps[idx] switch
+        {
+            "welcome" => BuildWelcome(),
+            "apikey"  => BuildApiKey(),
+            "steam"   => BuildSteam(),
+            "ready"   => BuildReady(),
+            _         => new StackPanel(),
+        };
+
+        string StepTitle(int idx) => steps[idx] switch
+        {
+            "welcome" => $"Get started  ·  Step 1 of {steps.Count}",
+            "apikey"  => $"GameGen API Key  ·  Step {idx + 1} of {steps.Count}",
+            "steam"   => $"Steam Path  ·  Step {idx + 1} of {steps.Count}",
+            "ready"   => "All set!",
+            _         => "Setup",
+        };
+
+        string PrimaryLabel(int idx) => steps[idx] == "ready" ? "Generate!" : "Next  →";
+
+        bool ValidateCurrent()
+        {
+            if (steps[cur] != "apikey") return true;
+
+            var key = apiKeyBox?.Password?.Trim() ?? "";
+            if (!string.IsNullOrEmpty(key))
+            {
+                GameGenApiKeyStore.Replace(key);
+                if (apiKeyBox != null) apiKeyBox.Password = "";
+                return true;
+            }
+            if (apiKeyHint != null)
+            {
+                apiKeyHint.Text       = "Please paste your API key before continuing.";
+                apiKeyHint.Visibility = Visibility.Visible;
+            }
+            return false;
+        }
+
+        // ── Dialog shell ──────────────────────────────────────────────────────
+
+        var dlg = new ContentDialog
+        {
+            XamlRoot            = XamlRoot!,
+            DefaultButton       = ContentDialogButton.Primary,
+            PrimaryButtonText   = PrimaryLabel(cur),
+            SecondaryButtonText = "",
+            CloseButtonText     = "Cancel",
+            Title               = StepTitle(cur),
+            Content             = BuildContent(cur),
+        };
+
+        void RefreshDialog()
+        {
+            dlg.Title               = StepTitle(cur);
+            dlg.Content             = BuildContent(cur);
+            dlg.PrimaryButtonText   = PrimaryLabel(cur);
+            dlg.SecondaryButtonText = cur > 0 ? "←  Back" : "";
+        }
+
+        dlg.PrimaryButtonClick += (_, e) =>
+        {
+            if (!ValidateCurrent()) { e.Cancel = true; return; }
+            cur++;
+            if (cur >= steps.Count)
+            {
+                done = true;   // let the dialog close naturally
+            }
+            else
+            {
+                e.Cancel = true;   // stay open; navigate to next step
+                RefreshDialog();
+            }
+        };
+
+        dlg.SecondaryButtonClick += (_, e) =>
+        {
+            if (cur <= 0) return;
+            e.Cancel = true;
+            cur--;
+            RefreshDialog();
+        };
+
+        await dlg.ShowAsync();
+        return done;
     }
 
     // ── SteamTools dialog ─────────────────────────────────────────────────────

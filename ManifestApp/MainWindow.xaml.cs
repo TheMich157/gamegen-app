@@ -179,6 +179,12 @@ public sealed partial class MainWindow : Window
             NavFrame.Navigate(typeof(SettingsPage));
     }
 
+    internal void NavigateToSettings()
+    {
+        if (NavFrame.CurrentSourcePageType != typeof(SettingsPage))
+            NavFrame.Navigate(typeof(SettingsPage));
+    }
+
     private void NavFrame_OnNavigated(object sender, NavigationEventArgs e)
     {
         if (e.Content is SettingsPage)
@@ -245,6 +251,9 @@ public sealed partial class MainWindow : Window
         OnboardingHost.Visibility = Visibility.Collapsed;
         NavFrame.Navigate(typeof(HomePage), new HomeNavigationArgs(HomeLandingMode.StoreSearch));
         SvcsDiscordReload();
+
+        // Kick off background stats load so the pane footer populates without blocking startup
+        _ = RefreshUserStatsAsync();
     }
 
     private void FinishWelcomeFlow()
@@ -297,7 +306,98 @@ public sealed partial class MainWindow : Window
             return;
         }
 
+        if (tag == "game-requests")
+        {
+            NavFrame.Navigate(typeof(GameRequestsPage));
+            return;
+        }
+
         if (tag == "home")
             NavFrame.Navigate(typeof(HomePage), new HomeNavigationArgs(HomeLandingMode.StoreSearch));
+    }
+
+    // ── Game Requests navigation ──────────────────────────────────────────────
+
+    /// <summary>
+    /// Navigates to the Game Requests page, optionally pre-selecting a game
+    /// (called from the Home page install-failure flow).
+    /// </summary>
+    internal void NavigateToRequests(uint? appId = null, string? gameName = null)
+    {
+        // Highlight the Requests nav item
+        foreach (var item in NavView.MenuItems.OfType<NavigationViewItem>())
+        {
+            if (item.Tag is string tag && tag == "game-requests")
+            {
+                NavView.SelectedItem = item;
+                break;
+            }
+        }
+        NavFrame.Navigate(typeof(GameRequestsPage),
+            new GameRequestsNavigationArgs(appId, gameName));
+    }
+
+    // ── User stats (pane footer) ──────────────────────────────────────────────
+
+    /// <summary>
+    /// Fetches /api/{key}/stats and populates the pane-footer user card.
+    /// Safe to call at any time; silently no-ops when no key is configured.
+    /// </summary>
+    internal async Task RefreshUserStatsAsync()
+    {
+        var svcs = ((App)Application.Current).Svcs;
+
+        if (!ManifestApp.Services.GameGenApiKeyStore.TryRetrieve(out var key) ||
+            string.IsNullOrWhiteSpace(key))
+        {
+            UserStatsCard.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        try
+        {
+            var stats = await svcs.GameGenApi
+                .GetStatsAsync(key.Trim(), CancellationToken.None)
+                .ConfigureAwait(true);
+
+            if (!stats.Ok)
+            {
+                UserStatsCard.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            // Prefer display name → raw Discord ID → generic fallback
+            string nameText;
+            if (!string.IsNullOrWhiteSpace(stats.DisplayName))
+                nameText = stats.DisplayName;
+            else if (!string.IsNullOrWhiteSpace(stats.DiscordId))
+                nameText = $"Discord ID {stats.DiscordId}";
+            else
+                nameText = "Discord account";
+
+            PaneUserName.Text    = nameText;
+            PaneDiscordTag.Text  = !string.IsNullOrWhiteSpace(stats.DisplayName) ? "via Discord" : "";
+
+            PanePlanText.Text = string.IsNullOrWhiteSpace(stats.Plan)
+                ? ""
+                : $"Plan: {stats.Plan}";
+
+            if (stats.CreditsRemaining.HasValue)
+            {
+                PaneCreditsText.Text = stats.CreditsTotal.HasValue
+                    ? $"Credits: {stats.CreditsRemaining}/{stats.CreditsTotal} today"
+                    : $"Credits left: {stats.CreditsRemaining}";
+            }
+            else
+            {
+                PaneCreditsText.Text = "";
+            }
+
+            UserStatsCard.Visibility = Visibility.Visible;
+        }
+        catch
+        {
+            UserStatsCard.Visibility = Visibility.Collapsed;
+        }
     }
 }

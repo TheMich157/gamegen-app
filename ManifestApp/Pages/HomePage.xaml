@@ -117,7 +117,7 @@
 
                             <StackPanel Grid.Column="0" Spacing="0">
                                 <TextBlock x:Name="StatTitlesValue"
-                                           Text="0"
+                                           Text="50k+"
                                            FontSize="26" FontWeight="Bold" LineHeight="30">
                                     <TextBlock.Foreground>
                                         <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
