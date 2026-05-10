@@ -443,23 +443,25 @@
                             FontSize="13"
                             TextWrapping="WrapWholeWords" />
 
-                        <StackPanel
-                            x:Name="DetailActionsRow"
-                            Orientation="Horizontal"
-                            Spacing="8">
+                        <Grid x:Name="DetailActionsRow" ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
                             <Button
                                 x:Name="InstallButton"
-                                MinWidth="150" MinHeight="40"
+                                Grid.Column="0"
+                                HorizontalAlignment="Stretch" MinHeight="40"
                                 Click="Install_Click"
                                 Content="Install manifests"
                                 Style="{StaticResource AccentButtonStyle}" />
-
                             <Button
                                 x:Name="RemoveButton"
-                                MinWidth="130" MinHeight="40"
+                                Grid.Column="1"
+                                HorizontalAlignment="Stretch" MinHeight="40"
                                 Click="Remove_Click"
                                 Content="Remove files" />
-                        </StackPanel>
+                        </Grid>
 
                         <Button
                             x:Name="LaunchSteamButton"
@@ -506,11 +508,27 @@
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         </StackPanel>
 
-                        <MenuFlyoutSeparator />
+                        <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Margin="0,4,0,0" />
 
-                        <StackPanel Orientation="Horizontal" Spacing="4">
-                            <HyperlinkButton Click="OpenPluginFolder_Click" Content="Open stplug-in" />
-                            <HyperlinkButton Click="OpenDepotFolder_Click" Content="Open depotcache" />
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="FOLDERS"
+                                       FontSize="10" FontWeight="SemiBold"
+                                       CharacterSpacing="160"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <StackPanel Orientation="Horizontal" Spacing="0" Margin="-8,0,0,0">
+                                <HyperlinkButton Click="OpenPluginFolder_Click" Padding="8,6,8,6">
+                                    <StackPanel Orientation="Horizontal" Spacing="5">
+                                        <FontIcon Glyph="&#xE8B7;" FontSize="12" />
+                                        <TextBlock Text="stplug-in" FontSize="12" />
+                                    </StackPanel>
+                                </HyperlinkButton>
+                                <HyperlinkButton Click="OpenDepotFolder_Click" Padding="8,6,8,6">
+                                    <StackPanel Orientation="Horizontal" Spacing="5">
+                                        <FontIcon Glyph="&#xE8B7;" FontSize="12" />
+                                        <TextBlock Text="depotcache" FontSize="12" />
+                                    </StackPanel>
+                                </HyperlinkButton>
+                            </StackPanel>
                         </StackPanel>
                     </StackPanel>
                 </ScrollViewer>

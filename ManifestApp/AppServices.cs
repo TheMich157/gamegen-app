@@ -15,11 +15,13 @@ internal sealed class AppServices
         SteamStoreDetails = new ManifestApp.Core.SteamStoreAppDetailsClient(Http);
         ArtworkCache = new(Http);
         InstalledRecords = new();
-        GameGenApi = new(Http, SettingsStore);
+        GameGenApi   = new(Http, SettingsStore);
+        Activation   = new(Http, SettingsStore);
         ZipInstaller = new(InstalledRecords, PathsResolver);
         SteamToolsLocator = new(SettingsStore, PathsResolver);
         DiscordPresence = new DiscordPresenceService(SettingsStore);
-        UpdateChecker = new UpdateService(Http);
+        UpdateChecker   = new UpdateService(Http);
+        AdminReporter   = new AdminReporterService(Http, SettingsStore);
     }
 
     internal HttpClient Http { get; }
@@ -38,7 +40,8 @@ internal sealed class AppServices
 
     internal ManifestApp.Core.InstalledManifestStore InstalledRecords { get; }
 
-    internal ManifestApp.Core.GameGenApiClient GameGenApi { get; }
+    internal ManifestApp.Core.GameGenApiClient  GameGenApi  { get; }
+    internal ManifestApp.Core.ActivationClient  Activation  { get; }
 
     internal ManifestApp.Core.ZipManifestInstaller ZipInstaller { get; }
 
@@ -53,4 +56,6 @@ internal sealed class AppServices
     /// Non-null and <see cref="Services.UpdateResult.IsUpdateAvailable"/> only when an update was found.
     /// </summary>
     internal UpdateResult? StartupUpdateResult { get; set; }
+
+    internal AdminReporterService AdminReporter { get; }
 }

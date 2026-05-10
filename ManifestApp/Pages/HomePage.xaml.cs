@@ -309,6 +309,7 @@ public sealed partial class HomePage : Page
             }
 
             GamesGrid.ItemsSource = view;
+            _ = TypedApp.Svcs.AdminReporter.ReportSearchAsync(query);
 
             DetailTitle.Text = $"{hits.Count:N0} games found";
             DetailStatus.Text = "Select a game to see its App ID and install or remove manifests.";
@@ -758,6 +759,8 @@ public sealed partial class HomePage : Page
                           "GameGen response could not be turned into manifest artifacts.";
                 DetailStatus.Text = err;
 
+                _ = TypedApp.Svcs.AdminReporter.ReportInstallAsync(row.AppId, row.DisplayName, false);
+
                 // Check quota exhaustion first — show a specific daily-limit warning
                 // instead of the generic "request this game" dialog.
                 var (isQuotaExhausted, cachedStats) = await CheckQuotaAsync(err);
@@ -784,27 +787,7 @@ public sealed partial class HomePage : Page
             row.IsConfigured = true;
             HydrateTrackedState(row);
             DetailStatus.Text = $"Install finished for App ID {row.AppId}.";
-
-            // Offer to run SteamTools if found
-            if (TypedApp.Svcs.SteamToolsLocator.TryFindSteamTools(out var toolsPath))
-            {
-                var runTools = await AskRunSteamToolsAsync().ConfigureAwait(true);
-                if (runTools)
-                {
-                    try
-                    {
-                        Process.Start(new ProcessStartInfo
-                        {
-                            FileName = toolsPath,
-                            UseShellExecute = true,
-                        });
-                    }
-                    catch (Exception ex)
-                    {
-                        DetailStatus.Text += $"\nCould not launch SteamTools: {ex.Message}";
-                    }
-                }
-            }
+            _ = TypedApp.Svcs.AdminReporter.ReportInstallAsync(row.AppId, row.DisplayName, true);
 
             await OfferSteamGracefulRestartAfterManifestMutationAsync(
                 "Manifest files were installed. Restart the Steam client now so it reloads stplug-in and depot cache changes.",
@@ -841,6 +824,7 @@ public sealed partial class HomePage : Page
             TypedApp.Svcs.DiscordPresence.NotifyRemoving(TruncateForDiscordPresence(row.DisplayName, 72));
 
             TypedApp.Svcs.ZipInstaller.RemoveForApp(row.AppId);
+            _ = TypedApp.Svcs.AdminReporter.ReportRemoveAsync(row.AppId, row.DisplayName);
 
             if (SourceCombo.SelectedIndex == 2)
             {
@@ -989,6 +973,29 @@ public sealed partial class HomePage : Page
     }
 
     /// <summary>
+    /// Formats the quota reset timestamp into a human-readable label.
+    /// Accepts an ISO-8601 string from the API; falls back to a generic message.
+    /// </summary>
+    private static string ResetAtLabel(string? resetAt)
+    {
+        if (!string.IsNullOrWhiteSpace(resetAt) &&
+            DateTimeOffset.TryParse(resetAt,
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.RoundtripKind,
+                out var dt))
+        {
+            var local = dt.ToLocalTime();
+            var diff  = local - DateTimeOffset.Now;
+            if (diff.TotalMinutes < 1)
+                return "Quota resets in less than a minute";
+            if (diff.TotalHours < 1)
+                return $"Quota resets in {(int)diff.TotalMinutes} min";
+            return $"Quota resets at {local:h:mm tt}";
+        }
+        return "Quota resets every 24 hours";
+    }
+
+    /// <summary>
     /// Shows a targeted "daily limit reached" dialog that includes the user's
     /// plan name and total daily allowance. Accepts pre-fetched stats so no
     /// extra API call is needed.
@@ -1026,11 +1033,11 @@ public sealed partial class HomePage : Page
                     },
                     new InfoBar
                     {
-                        IsOpen    = true,
+                        IsOpen     = true,
                         IsClosable = false,
-                        Severity  = InfoBarSeverity.Warning,
-                        Title     = "Resets every 24 hours",
-                        Message   = "Your quota resets daily. Try again tomorrow, or upgrade your plan at gamegen.lol for a higher limit.",
+                        Severity   = InfoBarSeverity.Warning,
+                        Title      = ResetAtLabel(stats?.ResetAt),
+                        Message    = "Upgrade your plan at gamegen.lol for a higher daily limit.",
                     },
                 },
             },
@@ -1406,22 +1413,6 @@ public sealed partial class HomePage : Page
 
         await dlg.ShowAsync();
         return done;
-    }
-
-    // ── SteamTools dialog ─────────────────────────────────────────────────────
-
-    private async Task<bool> AskRunSteamToolsAsync()
-    {
-        var dlg = new ContentDialog
-        {
-            Title              = "Run SteamTools?",
-            Content            = "SteamTools was found. Run it now to activate the installed manifest?",
-            PrimaryButtonText  = "Run SteamTools",
-            CloseButtonText    = "Skip",
-            DefaultButton      = ContentDialogButton.Primary,
-            XamlRoot           = XamlRoot!,
-        };
-        return await dlg.ShowAsync() == ContentDialogResult.Primary;
     }
 
     // ── Install progress helpers ──────────────────────────────────────────────

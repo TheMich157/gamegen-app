@@ -94,6 +94,19 @@
                                            FontSize="11"
                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                            Margin="21,0,0,0" />
+
+                                <StackPanel x:Name="KeyStatusRow"
+                                            Orientation="Horizontal" Spacing="6"
+                                            Margin="21,3,0,0"
+                                            Visibility="Collapsed">
+                                    <Ellipse x:Name="KeyStatusDot"
+                                             Width="7" Height="7"
+                                             VerticalAlignment="Center" />
+                                    <TextBlock x:Name="KeyStatusText"
+                                               FontSize="10" FontWeight="SemiBold"
+                                               VerticalAlignment="Center"
+                                               CharacterSpacing="60" />
+                                </StackPanel>
                             </StackPanel>
                         </Border>
                     </Border>
@@ -130,6 +143,11 @@
             <!-- Startup splash; sits on top of NavigationView and OnboardingHost until init completes. -->
             <Grid x:Name="SplashHost" IsHitTestVisible="True">
                 <pages:SplashOverlay x:Name="Splash" />
+            </Grid>
+
+            <!-- Admin lockout overlay -->
+            <Grid x:Name="LockoutHost" Visibility="Collapsed" IsHitTestVisible="True" Canvas.ZIndex="999">
+                <pages:LockoutOverlay />
             </Grid>
         </Grid>
     </Grid>

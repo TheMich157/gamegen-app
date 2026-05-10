@@ -20,8 +20,11 @@ public sealed class SettingsStore
         try
         {
             var json = File.ReadAllText(AppPaths.SettingsPath);
-            var s = JsonSerializer.Deserialize<AppSettings>(json, JsonOptions);
-            return s ?? new AppSettings();
+            var s = JsonSerializer.Deserialize<AppSettings>(json, JsonOptions) ?? new AppSettings();
+            // Re-apply defaults for fields that may be null in settings files saved before
+            // the default was introduced (System.Text.Json restores explicit nulls from disk).
+            s.AdminEndpointUrl ??= "https://gamegen.lol";
+            return s;
         }
         catch
         {

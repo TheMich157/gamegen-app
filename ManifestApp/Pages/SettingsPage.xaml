@@ -50,134 +50,152 @@
             </Border>
 
             <!-- ──────── APPEARANCE ──────── -->
-            <StackPanel Spacing="2">
-                <TextBlock Text="APPEARANCE"
-                           FontSize="11" FontWeight="SemiBold"
-                           CharacterSpacing="220"
-                           Foreground="{StaticResource GameGenAccentGradientBrush}" />
-                <TextBlock FontSize="22" FontWeight="SemiBold" Text="Theme &amp; integrations" />
-            </StackPanel>
+            <Border CornerRadius="14" Padding="20,18,20,18"
+                    BorderThickness="1"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                <StackPanel Spacing="16">
+                    <StackPanel Spacing="2">
+                        <TextBlock Text="APPEARANCE"
+                                   FontSize="11" FontWeight="SemiBold"
+                                   CharacterSpacing="220"
+                                   Foreground="{StaticResource GameGenAccentGradientBrush}" />
+                        <TextBlock FontSize="22" FontWeight="SemiBold" Text="Theme &amp; integrations" />
+                    </StackPanel>
 
-            <ToggleSwitch
-                x:Name="DarkThemeToggle"
-                Header="Dark theme"
-                OffContent="Following Windows"
-                OnContent="Always dark"
-                Toggled="DarkThemeToggle_Toggled" />
+                    <StackPanel Spacing="4">
+                        <ToggleSwitch
+                            x:Name="DarkThemeToggle"
+                            Header="Dark theme"
+                            OffContent="Following Windows"
+                            OnContent="Always dark"
+                            Toggled="DarkThemeToggle_Toggled" />
+                        <TextBlock
+                            FontSize="12"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="When dark theme is off, the app picks light or dark from Windows. Turning it on forces dark Fluent styling everywhere."
+                            TextWrapping="WrapWholeWords"
+                            Margin="0,0,0,4" />
+                    </StackPanel>
 
-            <TextBlock
-                FontSize="12"
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                Text="When dark theme is off, the app picks light or dark from Windows. Turning it on forces dark Fluent styling everywhere."
-                TextWrapping="WrapWholeWords" />
-
-            <ToggleSwitch
-                x:Name="DiscordPresenceToggle"
-                Header="Discord Rich Presence"
-                OffContent="Shown in Discord"
-                OnContent="Hidden"
-                Toggled="DiscordPresenceToggle_Toggled" />
-
-            <TextBlock
-                FontSize="12"
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                Text="Requires the Discord desktop app. When hidden, GameGen stops updating your Discord status."
-                TextWrapping="WrapWholeWords" />
+                    <StackPanel Spacing="4">
+                        <ToggleSwitch
+                            x:Name="DiscordPresenceToggle"
+                            Header="Discord Rich Presence"
+                            OffContent="Shown in Discord"
+                            OnContent="Hidden"
+                            Toggled="DiscordPresenceToggle_Toggled" />
+                        <TextBlock
+                            FontSize="12"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="Requires the Discord desktop app. When hidden, GameGen stops updating your Discord status."
+                            TextWrapping="WrapWholeWords" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
 
             <!-- ──────── STEAM PATHS ──────── -->
-            <StackPanel Spacing="2" Margin="0,16,0,0">
-                <TextBlock Text="STEAM PATHS"
-                           FontSize="11" FontWeight="SemiBold"
-                           CharacterSpacing="220"
-                           Foreground="{StaticResource GameGenAccentGradientBrush}" />
-                <TextBlock FontSize="22" FontWeight="SemiBold" Text="Where GameGen drops manifests" />
-            </StackPanel>
+            <Border CornerRadius="14" Padding="20,18,20,18"
+                    BorderThickness="1"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                <StackPanel Spacing="10">
+                    <StackPanel Spacing="2">
+                        <TextBlock Text="STEAM PATHS"
+                                   FontSize="11" FontWeight="SemiBold"
+                                   CharacterSpacing="220"
+                                   Foreground="{StaticResource GameGenAccentGradientBrush}" />
+                        <TextBlock FontSize="22" FontWeight="SemiBold" Text="Where GameGen drops manifests" />
+                    </StackPanel>
 
-            <TextBlock
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                Text="Steam paths default from the registry. Override them here if installs are unusual or inaccessible."
-                TextWrapping="WrapWholeWords" />
+                    <TextBlock
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="Steam paths default from the registry. Override them here if installs are unusual or inaccessible."
+                        TextWrapping="WrapWholeWords" />
 
-            <TextBox
-                x:Name="SteamPathBox"
-                Header="Steam install folder"
-                AutomationProperties.HelpText="Folder that contains steam.exe"
-                PlaceholderText="Example: C:\Program Files (x86)\Steam" />
+                    <TextBox
+                        x:Name="SteamPathBox"
+                        Header="Steam install folder"
+                        AutomationProperties.HelpText="Folder that contains steam.exe"
+                        PlaceholderText="Example: C:\Program Files (x86)\Steam" />
+                    <Button Click="BrowseSteam_Click" Content="Browse folder..." />
 
-            <Button Margin="0,0,0,8" Click="BrowseSteam_Click" Content="Browse folder..." />
+                    <TextBox
+                        x:Name="PluginPathBox"
+                        Header="stplug-in folder"
+                        AutomationProperties.HelpText=".lua scripts are deployed here."
+                        PlaceholderText="Example: ...\Steam\config\stplug-in" />
+                    <Button Click="BrowsePlugin_Click" Content="Browse folder..." />
 
-            <TextBox
-                x:Name="PluginPathBox"
-                Header="stplug-in folder"
-                AutomationProperties.HelpText=".lua scripts are deployed here."
-                PlaceholderText="Example: ...\Steam\config\stplug-in" />
+                    <TextBox
+                        x:Name="DepotPathBox"
+                        Header="depotcache folder"
+                        AutomationProperties.HelpText=".manifest files are deployed here."
+                        PlaceholderText="Example: ...\Steam\config\depotcache" />
+                    <Button Click="BrowseDepot_Click" Content="Browse folder..." />
 
-            <Button Margin="0,0,0,8" Click="BrowsePlugin_Click" Content="Browse folder..." />
+                    <Button Click="ResetPathsFromSteam_Click"
+                            Content="Reset plugin + depot folders from Steam path" />
 
-            <TextBox
-                x:Name="DepotPathBox"
-                Header="depotcache folder"
-                AutomationProperties.HelpText=".manifest files are deployed here."
-                PlaceholderText="Example: ...\Steam\config\depotcache" />
+                    <TextBox
+                        x:Name="SteamToolsPathBox"
+                        Header="SteamTools.exe (optional override)"
+                        PlaceholderText="Defaults to Steam install folder lookup" />
+                    <Button Click="BrowseSteamTools_Click" Content="Browse SteamTools.exe..." />
 
-            <Button Margin="0,0,0,8" Click="BrowseDepot_Click" Content="Browse folder..." />
+                    <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Margin="0,4,0,4" />
 
-            <Button
-                Margin="0,8,0,8"
-                Click="ResetPathsFromSteam_Click"
-                Content="Reset plugin + depot folders from Steam path" />
+                    <Button Click="SaveSettings_Click"
+                            Style="{StaticResource AccentButtonStyle}"
+                            Content="Save Steam settings" />
 
-            <TextBox
-                x:Name="SteamToolsPathBox"
-                Header="SteamTools.exe (optional override)"
-                PlaceholderText="Defaults to Steam install folder lookup" />
-
-            <Button Margin="0,0,0,16" Click="BrowseSteamTools_Click" Content="Browse SteamTools.exe..." />
-
-            <Button Click="SaveSettings_Click"
-                    Style="{StaticResource AccentButtonStyle}"
-                    Content="Save Steam settings" />
-
-            <TextBlock
-                x:Name="SaveSettingsStatus"
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                TextWrapping="WrapWholeWords"
-                Visibility="Collapsed" />
+                    <TextBlock
+                        x:Name="SaveSettingsStatus"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        TextWrapping="WrapWholeWords"
+                        Visibility="Collapsed" />
+                </StackPanel>
+            </Border>
 
             <!-- ──────── GAMEGEN API ──────── -->
-            <StackPanel Spacing="2" Margin="0,16,0,0">
-                <TextBlock Text="GAMEGEN API"
-                           FontSize="11" FontWeight="SemiBold"
-                           CharacterSpacing="220"
-                           Foreground="{StaticResource GameGenAccentGradientBrush}" />
-                <TextBlock FontSize="22" FontWeight="SemiBold" Text="Authorize manifest downloads" />
-            </StackPanel>
+            <Border CornerRadius="14" Padding="20,18,20,18"
+                    BorderThickness="1"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                <StackPanel Spacing="10">
+                    <StackPanel Spacing="2">
+                        <TextBlock Text="GAMEGEN API"
+                                   FontSize="11" FontWeight="SemiBold"
+                                   CharacterSpacing="220"
+                                   Foreground="{StaticResource GameGenAccentGradientBrush}" />
+                        <TextBlock FontSize="22" FontWeight="SemiBold" Text="Authorize manifest downloads" />
+                    </StackPanel>
 
-            <TextBlock
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                Text="Enter your GameGen API key from gamegen.lol (your dashboard). Downloads will not succeed until it is pasted and saved here."
-                TextWrapping="WrapWholeWords" />
+                    <TextBlock
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="Enter your GameGen API key from gamegen.lol (your dashboard). Downloads will not succeed until it is pasted and saved here."
+                        TextWrapping="WrapWholeWords" />
 
-            <PasswordBox
-                x:Name="ApiKeyBox"
-                Header="Your GameGen API key"
-                PlaceholderText="Paste key, then tap Save API key securely" />
+                    <PasswordBox
+                        x:Name="ApiKeyBox"
+                        Header="Your GameGen API key"
+                        PlaceholderText="Paste key, then tap Save API key securely" />
 
-            <Button Margin="0,8,0,0"
-                    Click="SaveGameGenSettings_Click"
-                    Content="Save API key"
-                    Style="{StaticResource AccentButtonStyle}" />
+                    <Button Click="SaveGameGenSettings_Click"
+                            Content="Save API key"
+                            Style="{StaticResource AccentButtonStyle}" />
 
-            <TextBlock Margin="0,8,0,0" FontSize="12"
-                       Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                       TextWrapping="WrapWholeWords"
-                       Text="Clears password field after saving. Leave password empty to keep the current stored key." />
+                    <TextBlock FontSize="12"
+                               Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                               TextWrapping="WrapWholeWords"
+                               Text="Clears password field after saving. Leave password empty to keep the current stored key." />
 
-            <TextBlock
-                x:Name="ApiKeyStatus"
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                TextWrapping="WrapWholeWords"
-                Margin="0,8,0,0" />
+                    <TextBlock
+                        x:Name="ApiKeyStatus"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        TextWrapping="WrapWholeWords" />
+                </StackPanel>
+            </Border>
 
             <!-- ──────── ABOUT ──────── -->
             <StackPanel Spacing="2" Margin="0,16,0,0">

@@ -1,7 +1,9 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml.Navigation;
+using ManifestApp.Core;
 using ManifestApp.Pages;
 using ManifestApp.Services;
 using Windows.UI;
@@ -13,6 +15,8 @@ public sealed partial class MainWindow : Window
     private TrayIconService? _trayIcon;
     private bool             _splashStarted;
     private DispatcherTimer? _bgUpdateTimer;
+    private DispatcherTimer? _heartbeatTimer;
+    private DispatcherTimer? _statusPollTimer;
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     private static extern bool MessageBeep(uint uType);
@@ -160,7 +164,10 @@ public sealed partial class MainWindow : Window
 
     private void OnAppWindowClosing(AppWindow sender, AppWindowClosingEventArgs e)
     {
-        // Real exit: clean up tray and Discord
+        // Real exit: clean up tray, Discord, and background timers
+        _statusPollTimer?.Stop();
+        _heartbeatTimer?.Stop();
+        _bgUpdateTimer?.Stop();
         _trayIcon?.Dispose();
         _trayIcon = null;
         try { ((App)Application.Current).Svcs.DiscordPresence.Dispose(); } catch { /* ignore */ }
@@ -254,6 +261,42 @@ public sealed partial class MainWindow : Window
 
         // Kick off background stats load so the pane footer populates without blocking startup
         _ = RefreshUserStatsAsync();
+
+        // Poll key status every 10 seconds so suspensions / deletions appear near-instantly
+        _statusPollTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(10) };
+        _statusPollTimer.Tick += async (_, _) => await PollKeyStatusAsync();
+        _statusPollTimer.Start();
+
+        // Heartbeat every 30 seconds so admin commands (disable / forceUpdate) propagate quickly
+        _heartbeatTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
+        _heartbeatTimer.Tick += async (_, _) =>
+            await ((App)Application.Current).Svcs.AdminReporter.ReportHeartbeatAsync();
+        _heartbeatTimer.Start();
+    }
+
+    private async Task PollKeyStatusAsync()
+    {
+        if (!GameGenApiKeyStore.TryRetrieve(out var key) || string.IsNullOrWhiteSpace(key))
+            return;
+
+        try
+        {
+            var svcs = ((App)Application.Current).Svcs;
+            var stats = await svcs.GameGenApi
+                .GetStatsAsync(key.Trim(), CancellationToken.None)
+                .ConfigureAwait(true);
+
+            ApplyKeyStatus(stats.Ok ? stats : null, stats.Ok, stats.ErrorMessage);
+
+            if (stats.Ok && UserStatsCard.Visibility == Visibility.Visible)
+            {
+                if (stats.UsageToday.HasValue && stats.CreditsTotal.HasValue)
+                    PaneCreditsText.Text = $"{stats.UsageToday}/{stats.CreditsTotal} gens today";
+                else if (stats.CreditsRemaining.HasValue && stats.CreditsTotal.HasValue)
+                    PaneCreditsText.Text = $"{stats.CreditsRemaining}/{stats.CreditsTotal} remaining";
+            }
+        }
+        catch { /* silent — never block the UI */ }
     }
 
     private void FinishWelcomeFlow()
@@ -340,7 +383,9 @@ public sealed partial class MainWindow : Window
     // ── User stats (pane footer) ──────────────────────────────────────────────
 
     /// <summary>
-    /// Fetches /api/{key}/stats and populates the pane-footer user card.
+    /// Activates the app with the server (POST /activate) to register the machine and
+    /// retrieve user identity + usage in one call.  Falls back to GET /stats if activation
+    /// fails.  Populates the pane-footer user card and seeds the AdminReporter cache.
     /// Safe to call at any time; silently no-ops when no key is configured.
     /// </summary>
     internal async Task RefreshUserStatsAsync()
@@ -356,13 +401,44 @@ public sealed partial class MainWindow : Window
 
         try
         {
-            var stats = await svcs.GameGenApi
-                .GetStatsAsync(key.Trim(), CancellationToken.None)
-                .ConfigureAwait(true);
+            GameGenStatsResult? stats = null;
+            bool isNewUser = false;
 
-            if (!stats.Ok)
+            // Only call /activate on true first launch (MachineId not yet generated).
+            // Every other startup uses /stats which is read-only and costs zero credits.
+            var settings = svcs.SettingsStore.Load();
+            if (string.IsNullOrWhiteSpace(settings.MachineId))
             {
-                UserStatsCard.Visibility = Visibility.Collapsed;
+                var activation = await svcs.Activation
+                    .ActivateAsync(key.Trim(), CancellationToken.None)
+                    .ConfigureAwait(true);
+
+                if (activation.Ok)
+                {
+                    stats    = activation.ToStatsResult();
+                    isNewUser = activation.IsNewUser;
+                }
+            }
+
+            // Primary path for every launch after the first (and fallback if activation failed)
+            if (stats is null || !stats.Ok)
+            {
+                var fetched = await svcs.GameGenApi
+                    .GetStatsAsync(key.Trim(), CancellationToken.None)
+                    .ConfigureAwait(true);
+                if (fetched.Ok)
+                    stats = fetched;
+            }
+
+            if (stats is null || !stats.Ok)
+            {
+                var errMsg = stats?.ErrorMessage;
+                ApplyKeyStatus(stats, false, errMsg);
+                UserStatsCard.Visibility = Visibility.Visible;
+                PaneUserName.Text    = "API Key";
+                PaneDiscordTag.Text  = "";
+                PanePlanText.Text    = "";
+                PaneCreditsText.Text = errMsg ?? "Could not load account.";
                 return;
             }
 
@@ -382,11 +458,16 @@ public sealed partial class MainWindow : Window
                 ? ""
                 : $"Plan: {stats.Plan}";
 
-            if (stats.CreditsRemaining.HasValue)
+            if (stats.CreditsRemaining.HasValue || stats.UsageToday.HasValue)
             {
-                PaneCreditsText.Text = stats.CreditsTotal.HasValue
-                    ? $"Credits: {stats.CreditsRemaining}/{stats.CreditsTotal} today"
-                    : $"Credits left: {stats.CreditsRemaining}";
+                if (stats.UsageToday.HasValue && stats.CreditsTotal.HasValue)
+                    PaneCreditsText.Text = $"{stats.UsageToday}/{stats.CreditsTotal} gens today";
+                else if (stats.CreditsRemaining.HasValue && stats.CreditsTotal.HasValue)
+                    PaneCreditsText.Text = $"{stats.CreditsRemaining}/{stats.CreditsTotal} remaining";
+                else if (stats.CreditsRemaining.HasValue)
+                    PaneCreditsText.Text = $"{stats.CreditsRemaining} gens remaining";
+                else
+                    PaneCreditsText.Text = $"{stats.UsageToday} gens used today";
             }
             else
             {
@@ -394,10 +475,93 @@ public sealed partial class MainWindow : Window
             }
 
             UserStatsCard.Visibility = Visibility.Visible;
+            ApplyKeyStatus(stats, true, null);
+
+            // Show a one-time welcome notification for brand-new activations.
+            if (isNewUser)
+            {
+                GlobalUpdateNotification.Title   = "Welcome to GameGen!";
+                GlobalUpdateNotification.Message = $"Your account is activated. Plan: {stats.Plan ?? "Free"}";
+                GlobalUpdateNotification.Severity = Microsoft.UI.Xaml.Controls.InfoBarSeverity.Success;
+                GlobalUpdateNotification.IsOpen  = true;
+            }
+
+            // Cache identity in the reporter so subsequent event posts include user info.
+            svcs.AdminReporter.CacheStats(key.Trim(), stats!);
+            _ = svcs.AdminReporter.ReportStartupAsync();
         }
         catch
         {
             UserStatsCard.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    // ── Key status indicator ──────────────────────────────────────────────────
+
+    private void SetKeyStatus(string label, byte r, byte g, byte b)
+    {
+        KeyStatusDot.Fill = new SolidColorBrush(Color.FromArgb(255, r, g, b));
+        KeyStatusText.Text = label;
+        KeyStatusText.Foreground = new SolidColorBrush(Color.FromArgb(255, r, g, b));
+        KeyStatusRow.Visibility = Visibility.Visible;
+    }
+
+    private void ApplyKeyStatus(GameGenStatsResult? stats, bool ok, string? errorMessage)
+    {
+        if (stats == null && !ok)
+        {
+            SetKeyStatus("KEY INVALID", 0xFF, 0x55, 0x55);
+            return;
+        }
+
+        if (!ok)
+        {
+            var err = errorMessage?.ToLowerInvariant() ?? "";
+            if (err.Contains("401") || err.Contains("invalid"))
+                SetKeyStatus("KEY INVALID", 0xFF, 0x55, 0x55);
+            else if (err.Contains("429") || err.Contains("quota") || err.Contains("limit"))
+                SetKeyStatus("LIMIT REACHED", 0xFF, 0xA0, 0x40);
+            else
+                SetKeyStatus("UNAVAILABLE", 0xFF, 0xA0, 0x40);
+            return;
+        }
+
+        if (stats?.CreditsRemaining is 0)
+        {
+            SetKeyStatus("LIMIT REACHED", 0xFF, 0xA0, 0x40);
+            return;
+        }
+
+        SetKeyStatus("ACTIVE", 0x7D, 0xD3, 0xA0);
+    }
+
+    // ── Administrative Commands ───────────────────────────────────────────────
+
+    internal void ShowLockout()
+    {
+        Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread().TryEnqueue(() =>
+        {
+            LockoutHost.Visibility = Visibility.Visible;
+            NavView.IsEnabled = false;
+            SetKeyStatus("SUSPENDED", 0xFF, 0x44, 0x44);
+        });
+    }
+
+    internal async Task ForceUpdateAsync()
+    {
+        var svcs = ((App)Application.Current).Svcs;
+        var result = await svcs.UpdateChecker.CheckAsync();
+        if (result?.ExeDownloadUrl != null)
+        {
+            Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread().TryEnqueue(() =>
+            {
+                GlobalUpdateNotification.Message = "Forced update initiated by administrator...";
+                GlobalUpdateNotification.IsOpen = true;
+            });
+
+            var batPath = await svcs.UpdateChecker.DownloadUpdateAsync(result.ExeDownloadUrl);
+            if (batPath != null)
+                UpdateService.ApplyUpdate(batPath);
         }
     }
 }

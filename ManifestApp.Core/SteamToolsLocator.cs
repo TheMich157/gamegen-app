@@ -34,15 +34,25 @@ public sealed class SteamToolsLocator(SettingsStore settingsStore, SteamPathsRes
         }
 
         var programFilesX86 = Environment.GetEnvironmentVariable("ProgramFiles(x86)");
-        var programFiles = Environment.GetEnvironmentVariable("ProgramFiles");
-        foreach (var baseDir in new[] { programFilesX86, programFiles })
+        var programFiles    = Environment.GetEnvironmentVariable("ProgramFiles");
+        foreach (var baseDir in new[] { programFiles, programFilesX86 })
         {
             if (string.IsNullOrWhiteSpace(baseDir))
                 continue;
-            var guess = Path.Combine(baseDir, "SteamTools.exe");
-            if (File.Exists(guess))
+
+            // Primary: %ProgramFiles%\SteamTools\SteamTools.exe
+            var inSubfolder = Path.Combine(baseDir, "SteamTools", "SteamTools.exe");
+            if (File.Exists(inSubfolder))
             {
-                path = guess;
+                path = inSubfolder;
+                return true;
+            }
+
+            // Fallback: %ProgramFiles%\SteamTools.exe (flat install)
+            var flat = Path.Combine(baseDir, "SteamTools.exe");
+            if (File.Exists(flat))
+            {
+                path = flat;
                 return true;
             }
         }

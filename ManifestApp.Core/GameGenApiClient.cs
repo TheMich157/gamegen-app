@@ -16,108 +16,68 @@ public sealed class GameGenApiClient(HttpClient http, SettingsStore settingsStor
         if (string.IsNullOrWhiteSpace(apiKey))
             return GameGenZipResult.Fail("GameGen API key is empty. Add it in Settings.");
 
-        var keySeg = Uri.EscapeDataString(apiKey.Trim());
-        var generateUrl = $"{GetApiRoot().TrimEnd('/')}/api/{keySeg}/generate/{appId}";
+        var keySeg      = Uri.EscapeDataString(apiKey.Trim());
+        var generateUrl = $"{GetApiRoot().TrimEnd('/')}/api/{keySeg}/generate/{appId}?format=zip";
 
         try
         {
+            // Single API call — request ZIP directly so the server charges exactly one credit.
             using var req = new HttpRequestMessage(HttpMethod.Get, generateUrl);
-            req.Headers.Accept.ParseAdd("application/json");
-            using var jsonResponse =
+            req.Headers.Accept.ParseAdd("application/zip, application/octet-stream, application/json");
+            using var rsp =
                 await http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
                     .ConfigureAwait(false);
 
-            var raw = await ReadBodyAsync(jsonResponse.Content, cancellationToken).ConfigureAwait(false);
+            var raw = await StreamBodyAsync(rsp.Content, cancellationToken, progress).ConfigureAwait(false);
 
             if (LooksLikeZip(raw))
-            {
-                if (jsonResponse.IsSuccessStatusCode)
-                    return GameGenZipResult.Successful(raw);
+                return GameGenZipResult.Successful(raw);
 
-                return GameGenZipResult.Fail($"GameGen replied with ZIP along with HTTP {(int)jsonResponse.StatusCode}.");
-            }
-
-            if (!TryExtractJsonEnvelope(raw, out var explicitFail, out var err, out var dl, out var mApp))
+            // Server returned JSON — parse for error or a CDN downloadUrl.
+            if (TryExtractJsonEnvelope(raw, out var explicitFail, out var err, out var dl, out var mApp))
             {
-                if (!jsonResponse.IsSuccessStatusCode)
-                {
+                if (explicitFail)
+                    return GameGenZipResult.Fail(string.IsNullOrWhiteSpace(err)
+                        ? "GameGen returned success=false for this Steam App ID."
+                        : err!);
+
+                if (!string.IsNullOrEmpty(mApp) &&
+                    uint.TryParse(mApp, System.Globalization.NumberStyles.Integer,
+                        System.Globalization.CultureInfo.InvariantCulture, out var rspId) &&
+                    rspId != appId)
                     return GameGenZipResult.Fail(
-                        $"GameGen HTTP {(int)jsonResponse.StatusCode} — body was not recognizable JSON.");
+                        $"GameGen returned manifest for app {rspId}, but install targets {appId}.");
+
+                // downloadUrl is a CDN link — downloading it does not consume an additional credit.
+                if (!string.IsNullOrWhiteSpace(dl))
+                {
+                    try
+                    {
+                        var resolved = AbsoluteUrl(generateUrl, dl!);
+                        var zipBytes = await DownloadBytesAsync(resolved, cancellationToken, progress)
+                            .ConfigureAwait(false);
+                        return LooksLikeZip(zipBytes)
+                            ? GameGenZipResult.Successful(zipBytes)
+                            : GameGenZipResult.Fail("Download URL did not return a ZIP archive.");
+                    }
+                    catch (Exception ex)
+                    {
+                        return GameGenZipResult.Fail($"Downloading manifest ZIP failed: {ex.Message}");
+                    }
                 }
 
-                return await TryZipQueryFallbackAsync(generateUrl, cancellationToken, progress).ConfigureAwait(false);
-            }
-
-            if (explicitFail)
-            {
                 return GameGenZipResult.Fail(string.IsNullOrWhiteSpace(err)
-                    ? "GameGen returned success=false for this Steam App ID."
+                    ? $"GameGen HTTP {(int)rsp.StatusCode} — no manifest returned."
                     : err!);
             }
 
-            if (!string.IsNullOrEmpty(mApp) &&
-                uint.TryParse(mApp, System.Globalization.NumberStyles.Integer,
-                    System.Globalization.CultureInfo.InvariantCulture, out var rspId) &&
-                rspId != appId)
-            {
-                return GameGenZipResult.Fail(
-                    $"GameGen returned manifest metadata for Steam app {rspId}, but this install targets {appId}.");
-            }
-
-            if (!string.IsNullOrWhiteSpace(dl))
-            {
-                try
-                {
-                    var resolved = AbsoluteUrl(generateUrl, dl!);
-                    var zipBytes = await DownloadBytesAsync(resolved, cancellationToken, progress).ConfigureAwait(false);
-                    return LooksLikeZip(zipBytes)
-                        ? GameGenZipResult.Successful(zipBytes)
-                        : GameGenZipResult.Fail("GameGen download URL did not return a ZIP archive.");
-                }
-                catch (Exception ex)
-                {
-                    return GameGenZipResult.Fail($"Downloading manifest ZIP failed: {ex.Message}");
-                }
-            }
-
-            return await TryZipQueryFallbackAsync(generateUrl, cancellationToken, progress).ConfigureAwait(false);
+            return GameGenZipResult.Fail(rsp.IsSuccessStatusCode
+                ? "GameGen response was not a ZIP archive."
+                : $"GameGen HTTP {(int)rsp.StatusCode}.");
         }
         catch (Exception ex)
         {
             return GameGenZipResult.Fail($"Network error contacting GameGen: {ex.Message}");
-        }
-    }
-
-    private async Task<GameGenZipResult> TryZipQueryFallbackAsync(string generateUrl,
-        CancellationToken cancellationToken, IProgress<double>? progress = null)
-    {
-        var zipUrl = $"{generateUrl}?format=zip";
-        try
-        {
-            using var rsp =
-                await http.GetAsync(zipUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
-                    .ConfigureAwait(false);
-            using (rsp)
-            {
-                // Stream with progress for the fallback ZIP download
-                var raw = await StreamBodyAsync(rsp.Content, cancellationToken, progress).ConfigureAwait(false);
-
-                if (rsp.IsSuccessStatusCode && LooksLikeZip(raw))
-                    return GameGenZipResult.Successful(raw);
-
-                if (TryExtractJsonEnvelope(raw, out _, out var err, out _, out _))
-                {
-                    var msg = string.IsNullOrWhiteSpace(err) ? $"{(int)rsp.StatusCode} {rsp.ReasonPhrase}".Trim() : err;
-                    return GameGenZipResult.Fail($"{msg} (ZIP ?format=zip fallback).");
-                }
-
-                var hint = rsp.IsSuccessStatusCode ? "unexpected body" : DescribeHttp(rsp);
-                return GameGenZipResult.Fail($"{hint} (ZIP fallback).");
-            }
-        }
-        catch (Exception ex)
-        {
-            return GameGenZipResult.Fail($"ZIP fallback request failed: {ex.Message}");
         }
     }
 
@@ -329,52 +289,76 @@ public sealed class GameGenApiClient(HttpClient http, SettingsStore settingsStor
             using var doc = System.Text.Json.JsonDocument.Parse(raw);
             var root = doc.RootElement;
 
-            string? plan = null, displayName = null, discordId = null;
+            string? plan = null, displayName = null, discordId = null, userRole = null;
+            bool isStaff = false;
             int? creditsRemaining = null, creditsTotal = null;
 
             if (root.TryGetProperty("plan", out var p)) plan = p.GetString();
 
-            // Try every field name the GameGen API might use for the Discord account.
-            // Prefer human-readable display names; fall back to username/tag/email.
-            foreach (var field in new[]
+            // The API returns Discord identity nested under "user": { discordId, username, discriminator }
+            var userEl = root.TryGetProperty("user", out var u) && u.ValueKind == System.Text.Json.JsonValueKind.Object
+                ? u
+                : root;   // fall back to root-level search for older API shapes
+
+            if (userEl.TryGetProperty("discordId", out var did) &&
+                did.ValueKind == System.Text.Json.JsonValueKind.String)
+                discordId = did.GetString();
+
+            if (userEl.TryGetProperty("username", out var un) &&
+                un.ValueKind == System.Text.Json.JsonValueKind.String)
             {
-                "discordUsername", "discord_username", "discordName", "discord_name",
-                "discordTag",      "discord_tag",
-                "displayName",     "display_name",
-                "globalName",      "global_name",
-                "username",        "name",
-                "email",
-            })
-            {
-                if (root.TryGetProperty(field, out var v) &&
-                    v.ValueKind == System.Text.Json.JsonValueKind.String)
+                var name = un.GetString() ?? "";
+                // Append discriminator only when it's a legacy 4-digit tag (not "0" or absent)
+                if (userEl.TryGetProperty("discriminator", out var disc) &&
+                    disc.ValueKind == System.Text.Json.JsonValueKind.String)
                 {
-                    displayName = v.GetString();
-                    if (!string.IsNullOrWhiteSpace(displayName)) break;
+                    var tag = disc.GetString();
+                    if (!string.IsNullOrWhiteSpace(tag) && tag != "0")
+                        name = $"{name}#{tag}";
                 }
+                if (!string.IsNullOrWhiteSpace(name))
+                    displayName = name;
             }
 
-            // Also capture the raw Discord snowflake ID so the UI can fall back to it.
-            foreach (var field in new[] { "discordId", "discord_id", "discordUserId", "discord_user_id" })
+            if (userEl.TryGetProperty("role", out var roleEl) &&
+                roleEl.ValueKind == System.Text.Json.JsonValueKind.String)
+                userRole = roleEl.GetString();
+
+            if (userEl.TryGetProperty("isStaff", out var staffEl))
+                isStaff = staffEl.ValueKind == System.Text.Json.JsonValueKind.True ||
+                          (staffEl.ValueKind == System.Text.Json.JsonValueKind.String &&
+                           bool.TryParse(staffEl.GetString(), out var sb) && sb);
+
+            // Credits/usage are nested under "usage": { today, limit, remaining, resetAt }
+            int?     usageToday  = null;
+            string?  resetAt     = null;
+
+            if (root.TryGetProperty("usage", out var usage) &&
+                usage.ValueKind == System.Text.Json.JsonValueKind.Object)
             {
-                if (root.TryGetProperty(field, out var v) &&
-                    v.ValueKind == System.Text.Json.JsonValueKind.String)
+                if (usage.TryGetProperty("remaining", out var rem) && rem.TryGetInt32(out var r))
+                    creditsRemaining = r;
+                if (usage.TryGetProperty("limit", out var lim) && lim.TryGetInt32(out var l))
+                    creditsTotal = l;
+                if (usage.TryGetProperty("today", out var tod) && tod.TryGetInt32(out var t))
+                    usageToday = t;
+                if (usage.TryGetProperty("resetAt", out var rat) &&
+                    rat.ValueKind == System.Text.Json.JsonValueKind.String)
+                    resetAt = rat.GetString();
+            }
+            else
+            {
+                // Fallback: root-level search for older API shapes
+                foreach (var field in new[] { "creditsRemaining", "remaining", "credits", "dailyCreditsRemaining", "requestsRemaining" })
                 {
-                    discordId = v.GetString();
-                    if (!string.IsNullOrWhiteSpace(discordId)) break;
+                    if (root.TryGetProperty(field, out var v) && v.TryGetInt32(out var i))
+                    { creditsRemaining = i; break; }
                 }
-            }
-
-            foreach (var field in new[] { "creditsRemaining", "remaining", "credits", "dailyCreditsRemaining", "requestsRemaining" })
-            {
-                if (root.TryGetProperty(field, out var v) && v.TryGetInt32(out var i))
-                { creditsRemaining = i; break; }
-            }
-
-            foreach (var field in new[] { "creditsTotal", "dailyLimit", "totalCredits", "limit", "dailyCredits" })
-            {
-                if (root.TryGetProperty(field, out var v) && v.TryGetInt32(out var i))
-                { creditsTotal = i; break; }
+                foreach (var field in new[] { "creditsTotal", "dailyLimit", "totalCredits", "limit", "dailyCredits" })
+                {
+                    if (root.TryGetProperty(field, out var v) && v.TryGetInt32(out var i))
+                    { creditsTotal = i; break; }
+                }
             }
 
             return new GameGenStatsResult
@@ -383,8 +367,12 @@ public sealed class GameGenApiClient(HttpClient http, SettingsStore settingsStor
                 Plan             = plan,
                 CreditsRemaining = creditsRemaining,
                 CreditsTotal     = creditsTotal,
+                UsageToday       = usageToday,
+                ResetAt          = resetAt,
                 DisplayName      = displayName,
                 DiscordId        = discordId,
+                Role             = userRole,
+                IsStaff          = isStaff,
             };
         }
         catch (Exception ex)
@@ -423,8 +411,16 @@ public sealed class GameGenStatsResult
     public string? Plan             { get; init; }
     public int?    CreditsRemaining { get; init; }
     public int?    CreditsTotal     { get; init; }
+    /// <summary>Generations already used today (usage.today).</summary>
+    public int?    UsageToday       { get; init; }
+    /// <summary>ISO-8601 timestamp when the daily quota resets (usage.resetAt).</summary>
+    public string? ResetAt          { get; init; }
     public string? DisplayName      { get; init; }
     /// <summary>Raw Discord snowflake ID — used as last-resort display when no human-readable name is available.</summary>
     public string? DiscordId        { get; init; }
+    /// <summary>Role string from the API: "USER", "ADMIN", "OWNER", etc.</summary>
+    public string? Role             { get; init; }
+    /// <summary>True when role is anything other than USER (staff/admin/owner).</summary>
+    public bool    IsStaff          { get; init; }
     public string? ErrorMessage     { get; init; }
 }
