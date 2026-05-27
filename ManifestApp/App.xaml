@@ -27,6 +27,10 @@
                     <Color x:Key="SystemAccentColorDark2">#FF4827B2</Color>
                     <Color x:Key="SystemAccentColorDark3">#FF36198C</Color>
 
+                    <!-- Replace the flat dark-gray page background with a deep purple-tinted black
+                         so the GameGen brand carries beyond the hero card. -->
+                    <SolidColorBrush x:Key="ApplicationPageBackgroundThemeBrush" Color="#FF0E0B1C" />
+
                     <!-- Replace the flat accent-button surface with the GameGen gradient. -->
                     <LinearGradientBrush x:Key="AccentFillColorDefaultBrush" StartPoint="0,0" EndPoint="1,1">
                         <GradientStop Color="#FF8B65FF" Offset="0" />

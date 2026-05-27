@@ -15,6 +15,7 @@ public sealed class DiscordPresenceService : IDisposable
     private const string SearchingPrefix = "Searching store:";
     private const string InstallingPrefix = "Installing —";
     private const string RemovingPrefix = "Removing —";
+    private const string BrowsingPrefix = "Viewing —";
 
     /// <summary>Rich Presence artwork key registered under the Discord application (“gamegen”).</summary>
     private const string PresenceLargeImageKey = "gamegen";
@@ -88,6 +89,11 @@ public sealed class DiscordPresenceService : IDisposable
     public void NotifyRemoving(string displayNameTruncated)
     {
         SetPresence(PresenceDetails, $"{RemovingPrefix} {displayNameTruncated}");
+    }
+
+    public void NotifyBrowsingGame(string displayNameTruncated)
+    {
+        SetPresence(PresenceDetails, $"{BrowsingPrefix} {displayNameTruncated}");
     }
 
     private void SetPresence(string details, string? state = null)

@@ -192,10 +192,27 @@ public sealed partial class MainWindow : Window
             NavFrame.Navigate(typeof(SettingsPage));
     }
 
+    /// <summary>
+    /// Opens the per-game details page (Steam-style hero, screenshots, install actions).
+    /// Called from the Home grid when the user clicks a tile.
+    /// </summary>
+    internal void NavigateToGameDetails(uint appId, string displayName, bool isConfigured)
+    {
+        NavFrame.Navigate(
+            typeof(GameDetailsPage),
+            new GameDetailsNavigationArgs(appId, displayName, isConfigured));
+    }
+
     private void NavFrame_OnNavigated(object sender, NavigationEventArgs e)
     {
         if (e.Content is SettingsPage)
             ((App)Application.Current).Svcs.DiscordPresence.NotifySettingsPage();
+
+        // Collapse the side nav to a compact icon rail on the game details page
+        // (more room for the hero, screenshots, and trailer), restore on every other page.
+        NavView.PaneDisplayMode = e.Content is GameDetailsPage
+            ? NavigationViewPaneDisplayMode.LeftCompact
+            : NavigationViewPaneDisplayMode.Left;
     }
 
     /// <summary>Sets root <see cref="FrameworkElement.RequestedTheme"/> from JSON <c>PreferDarkUi</c>.</summary>

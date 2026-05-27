@@ -16,9 +16,27 @@ public partial class App : Application
             "MICROSOFT_WINDOWSAPPRUNTIME_BASE_DIRECTORY",
             AppContext.BaseDirectory);
 
+        // TEMP: diagnostic logging for XAML/runtime crashes
+        AppDomain.CurrentDomain.UnhandledException += (_, e) => LogCrash("AppDomain", e.ExceptionObject as Exception);
+        TaskScheduler.UnobservedTaskException += (_, e) => LogCrash("TaskScheduler", e.Exception);
+
         InitializeComponent();
 
+        UnhandledException += (_, e) => LogCrash("App", e.Exception);
+
         Svcs = new AppServices(CreateHttpClient());
+    }
+
+    private static void LogCrash(string source, Exception? ex)
+    {
+        try
+        {
+            var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "gamegen-crash.log");
+            System.IO.File.AppendAllText(path,
+                $"[{DateTime.Now:O}] [{source}] {ex?.GetType().FullName}: {ex?.Message}{Environment.NewLine}" +
+                $"{ex?.StackTrace}{Environment.NewLine}{Environment.NewLine}");
+        }
+        catch { /* best-effort */ }
     }
 
     private static HttpClient CreateHttpClient()
