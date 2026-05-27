@@ -14,6 +14,7 @@ public sealed partial class MainWindow : Window
 {
     private TrayIconService? _trayIcon;
     private bool             _splashStarted;
+    private bool             _isExiting;
     private DispatcherTimer? _bgUpdateTimer;
     private DispatcherTimer? _heartbeatTimer;
     private DispatcherTimer? _statusPollTimer;
@@ -36,6 +37,7 @@ public sealed partial class MainWindow : Window
             onCheckUpdates: OpenSettingsForUpdates,
             onExit: () =>
             {
+                _isExiting = true;
                 Close();
             });
 
@@ -59,14 +61,47 @@ public sealed partial class MainWindow : Window
     private async void BgUpdateTimer_Tick(object? sender, object e)
     {
         var svcs = ((App)Application.Current).Svcs;
+        
+        // 1. Check for application updates
         var result = await svcs.UpdateChecker.CheckAsync();
         if (result?.IsUpdateAvailable == true && !GlobalUpdateNotification.IsOpen)
         {
             svcs.StartupUpdateResult = result;
             GlobalUpdateNotification.Message = $"Version {result.LatestVersion} is available.";
             GlobalUpdateNotification.IsOpen = true;
+
+            // Trigger Windows Toast Notification for new update
+            NotificationService.ShowToast(
+                "New Update Available! 🚀",
+                $"Version {result.LatestVersion} of GameGen App is ready to install."
+            );
+
             try { MessageBeep(0x30); /* MB_ICONEXCLAMATION */ } catch { }
         }
+
+        // 2. Perform inactivity check (1-day threshold)
+        try
+        {
+            var settings = svcs.SettingsStore.Load();
+            var lastUsed = settings.LastUsedTime ?? DateTime.UtcNow;
+            var timeSinceLastUsed = DateTime.UtcNow - lastUsed;
+
+            if (timeSinceLastUsed >= TimeSpan.FromDays(1))
+            {
+                var lastNotification = settings.LastInactivityNotificationTime;
+                // Only notify if we haven't notified in the last 24 hours to prevent spam
+                if (lastNotification == null || (DateTime.UtcNow - lastNotification.Value) >= TimeSpan.FromDays(1))
+                {
+                    NotificationService.ShowToast(
+                        "We miss you! 🎮",
+                        "You haven't checked GameGen App in a while. Open the app to view new game releases and manifests!"
+                    );
+                    settings.LastInactivityNotificationTime = DateTime.UtcNow;
+                    svcs.SettingsStore.Save(settings);
+                }
+            }
+        }
+        catch { /* fail silent */ }
     }
 
     private async void GlobalUpdateNotification_InstallClick(object sender, RoutedEventArgs e)
@@ -85,7 +120,10 @@ public sealed partial class MainWindow : Window
     private void MainWindow_Activated(object sender, WindowActivatedEventArgs e)
     {
         if (e.WindowActivationState != WindowActivationState.Deactivated)
+        {
+            UpdateUserActivity();
             SyncCaptionButtonColors();
+        }
 
         if (!_splashStarted && e.WindowActivationState != WindowActivationState.Deactivated)
         {
@@ -164,6 +202,13 @@ public sealed partial class MainWindow : Window
 
     private void OnAppWindowClosing(AppWindow sender, AppWindowClosingEventArgs e)
     {
+        if (!_isExiting)
+        {
+            e.Cancel = true;
+            AppWindow.Hide();
+            return;
+        }
+
         // Real exit: clean up tray, Discord, and background timers
         _statusPollTimer?.Stop();
         _heartbeatTimer?.Stop();
@@ -175,6 +220,7 @@ public sealed partial class MainWindow : Window
 
     private void ShowFromTray()
     {
+        UpdateUserActivity();
         AppWindow.Show();
         Activate();
     }
@@ -259,6 +305,7 @@ public sealed partial class MainWindow : Window
 
     internal void NavigateShell()
     {
+        UpdateUserActivity();
         ApplyThemeFromSettings();
 
         var svc = ((App)Application.Current).Svcs;
@@ -580,5 +627,17 @@ public sealed partial class MainWindow : Window
             if (batPath != null)
                 UpdateService.ApplyUpdate(batPath);
         }
+    }
+
+    private void UpdateUserActivity()
+    {
+        try
+        {
+            var svcs = ((App)Application.Current).Svcs;
+            var settings = svcs.SettingsStore.Load();
+            settings.LastUsedTime = DateTime.UtcNow;
+            svcs.SettingsStore.Save(settings);
+        }
+        catch { /* fail silent */ }
     }
 }

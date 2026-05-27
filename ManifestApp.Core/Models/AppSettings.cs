@@ -36,4 +36,10 @@ public sealed class AppSettings
     /// Sent with every activation request so the server can track unique installs.
     /// </summary>
     public string? MachineId { get; set; }
+
+    /// <summary>Timestamp of the user's last direct activity / interaction.</summary>
+    public DateTime? LastUsedTime { get; set; }
+
+    /// <summary>Timestamp of when the last user-inactivity toast notification was fired.</summary>
+    public DateTime? LastInactivityNotificationTime { get; set; }
 }

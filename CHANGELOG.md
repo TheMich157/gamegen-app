@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.1.1] - 2026-05-27
+
+### Added
+- **Windows Toast Notifications** — Native desktop toast alerts when application updates are available or when the app has been inactive for 1 day.
+- **Active Background Execution** — The app now minimizes to the system tray when closing the window to keep the background force-updater and heartbeat running at all times.
+
+---
+
 ## [3.1.0] - 2026-05-27
 
 ### Added
