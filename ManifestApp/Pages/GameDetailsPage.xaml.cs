@@ -191,14 +191,13 @@ public sealed partial class GameDetailsPage : Page
             FontSize = 10,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             CharacterSpacing = 160,
-            Foreground = (Brush)Application.Current.Resources["TextFillColorTertiaryBrush"],
+            Opacity = 0.6,
         });
         sp.Children.Add(new TextBlock
         {
             Text = value,
             FontSize = 13,
             TextWrapping = TextWrapping.WrapWholeWords,
-            Foreground = (Brush)Application.Current.Resources["TextFillColorPrimaryBrush"],
         });
         return sp;
     }
@@ -212,7 +211,7 @@ public sealed partial class GameDetailsPage : Page
             FontSize = 10,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             CharacterSpacing = 160,
-            Foreground = (Brush)Application.Current.Resources["TextFillColorTertiaryBrush"],
+            Opacity = 0.6,
         });
 
         // Simple two-row wrap using StackPanels — sufficient for the 1–4 genres Steam typically returns.

@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.1.0] - 2026-05-27
+
+### Added
+- **Bulk Operations** — You can now select multiple games in the grid to install or remove manifests in bulk.
+- **Quota Error Handling** — Specific prompt guiding users to upgrade their plan when hitting their daily generation limit.
+
+---
+
 ## [2.0.0] – 2026-05-09
 
 ### Added
