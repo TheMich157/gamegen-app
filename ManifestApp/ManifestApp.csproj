@@ -16,9 +16,9 @@
     <EnableMsixTooling>true</EnableMsixTooling>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Version>3.0.1</Version>
-    <AssemblyVersion>3.0.1.0</AssemblyVersion>
-    <FileVersion>3.0.1.0</FileVersion>
+    <Version>3.0.2</Version>
+    <AssemblyVersion>3.0.2.0</AssemblyVersion>
+    <FileVersion>3.0.2.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -51,6 +51,8 @@
     <PackageReference Include="DiscordRichPresence" Version="1.6.1.70" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.1839" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.0.1" />
+    <!-- Windows DPAPI for the API-key file (System.Security.Cryptography.ProtectedData) -->
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="9.0.0" />
   </ItemGroup>
 
   <ItemGroup>

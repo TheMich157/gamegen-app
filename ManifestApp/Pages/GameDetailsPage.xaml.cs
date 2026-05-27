@@ -1520,9 +1520,22 @@ public sealed partial class GameDetailsPage : Page
             var key = apiKeyBox?.Password?.Trim() ?? "";
             if (!string.IsNullOrEmpty(key))
             {
-                GameGenApiKeyStore.Replace(key);
-                if (apiKeyBox != null) apiKeyBox.Password = "";
-                return true;
+                try
+                {
+                    GameGenApiKeyStore.Replace(key);
+                    if (apiKeyBox != null) apiKeyBox.Password = "";
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    // Save failure — show it inline instead of letting the dialog crash the app.
+                    if (apiKeyHint != null)
+                    {
+                        apiKeyHint.Text       = $"Couldn't store the key: {ex.Message}";
+                        apiKeyHint.Visibility = Visibility.Visible;
+                    }
+                    return false;
+                }
             }
             if (apiKeyHint != null)
             {
