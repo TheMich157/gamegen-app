@@ -69,24 +69,37 @@ internal static class GameGenApiKeyStore
 
     internal static void Replace(string plainTextKey)
     {
+        if (string.IsNullOrWhiteSpace(plainTextKey))
+            throw new ArgumentException("API key cannot be empty.", nameof(plainTextKey));
+
         var vault = new Windows.Security.Credentials.PasswordVault();
 
-        foreach (var c in vault.RetrieveAll().ToList())
+        // PasswordVault.RetrieveAll() throws COMException (E_ELEMENT_NOT_FOUND, 0x80070490)
+        // when the vault is empty — which is the first-launch case for every new user. Wrap
+        // the cleanup pass so a fresh vault doesn't blow up the API-key save flow.
+        try
         {
-            if (!string.Equals(c.UserName, User, StringComparison.Ordinal))
-                continue;
-            if (!string.Equals(c.Resource, Resource, StringComparison.Ordinal)
-                && !string.Equals(c.Resource, ResourceLegacy, StringComparison.Ordinal))
-                continue;
+            foreach (var c in vault.RetrieveAll().ToList())
+            {
+                if (!string.Equals(c.UserName, User, StringComparison.Ordinal))
+                    continue;
+                if (!string.Equals(c.Resource, Resource, StringComparison.Ordinal)
+                    && !string.Equals(c.Resource, ResourceLegacy, StringComparison.Ordinal))
+                    continue;
 
-            try
-            {
-                vault.Remove(c);
+                try
+                {
+                    vault.Remove(c);
+                }
+                catch
+                {
+                    // best-effort erase
+                }
             }
-            catch
-            {
-                // ignored — best-effort erase.
-            }
+        }
+        catch
+        {
+            // Vault is empty (or unreadable) — nothing to clean up before adding the new entry.
         }
 
         vault.Add(new Windows.Security.Credentials.PasswordCredential(Resource, User, plainTextKey));

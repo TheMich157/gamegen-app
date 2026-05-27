@@ -193,15 +193,34 @@ public sealed partial class SettingsPage : Page
     private void SaveGameGenSettings_Click(object sender, RoutedEventArgs e)
     {
         var keyProvided = false;
-        if (!string.IsNullOrWhiteSpace(ApiKeyBox.Password))
+        try
         {
-            GameGenApiKeyStore.Replace(ApiKeyBox.Password);
-            keyProvided = true;
+            if (!string.IsNullOrWhiteSpace(ApiKeyBox.Password))
+            {
+                GameGenApiKeyStore.Replace(ApiKeyBox.Password);
+                keyProvided = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            ApiKeyBox.Password = string.Empty;
+            ApiKeyStatus.Text  =
+                $"Couldn't write the API key to Windows Credential Locker: {ex.Message}";
+            return;
         }
 
         ApiKeyBox.Password = string.Empty;
 
-        var vaultOk = GameGenApiKeyStore.TryRetrieve(out _);
+        bool vaultOk;
+        try
+        {
+            vaultOk = GameGenApiKeyStore.TryRetrieve(out _);
+        }
+        catch
+        {
+            vaultOk = false;
+        }
+
         ApiKeyStatus.Text = vaultOk switch
         {
             true when keyProvided => "API key updated securely.",
