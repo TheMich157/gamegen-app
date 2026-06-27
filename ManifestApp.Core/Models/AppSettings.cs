@@ -25,6 +25,9 @@ public sealed class AppSettings
     /// <summary>When true, Discord Rich Presence IPC is not used (default false keeps presence on for existing settings files).</summary>
     public bool DiscordRichPresenceDisabled { get; set; }
 
+    /// <summary>How trailer videos behave when a game details page opens: muted, paused, or sound.</summary>
+    public string GameDetailsVideoStartupBehavior { get; set; } = "muted";
+
     /// <summary>
     /// Base URL for the report endpoint. Defaults to the main GameGen server.
     /// Leave empty to disable telemetry reporting entirely.

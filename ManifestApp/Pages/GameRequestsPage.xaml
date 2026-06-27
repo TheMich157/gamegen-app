@@ -30,7 +30,7 @@
             <StackPanel Spacing="12">
 
                 <!-- Status pill -->
-                <Border CornerRadius="999" Padding="10,4,14,4"
+                <Border CornerRadius="0" Padding="10,4,14,4"
                         BorderThickness="1" BorderBrush="#50C87941"
                         Background="#1FC87941"
                         HorizontalAlignment="Left">

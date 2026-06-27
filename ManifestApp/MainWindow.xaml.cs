@@ -18,6 +18,7 @@ public sealed partial class MainWindow : Window
     private DispatcherTimer? _bgUpdateTimer;
     private DispatcherTimer? _heartbeatTimer;
     private DispatcherTimer? _statusPollTimer;
+    private bool             _forceUpdateInProgress;
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     private static extern bool MessageBeep(uint uType);
@@ -603,29 +604,39 @@ public sealed partial class MainWindow : Window
 
     internal void ShowLockout()
     {
-        Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread().TryEnqueue(() =>
-        {
-            LockoutHost.Visibility = Visibility.Visible;
-            NavView.IsEnabled = false;
-            SetKeyStatus("SUSPENDED", 0xFF, 0x44, 0x44);
-        });
+        LockoutHost.Visibility = Visibility.Visible;
+        NavView.IsEnabled = false;
+        SetKeyStatus("SUSPENDED", 0xFF, 0x44, 0x44);
     }
 
-    internal async Task ForceUpdateAsync()
+    internal async Task ForceUpdateAsync(string? exeDownloadUrl = null)
     {
+        if (_forceUpdateInProgress)
+            return;
+
+        _forceUpdateInProgress = true;
         var svcs = ((App)Application.Current).Svcs;
-        var result = await svcs.UpdateChecker.CheckAsync();
-        if (result?.ExeDownloadUrl != null)
+        try
         {
-            Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread().TryEnqueue(() =>
+            if (string.IsNullOrWhiteSpace(exeDownloadUrl))
+            {
+                var result = await svcs.UpdateChecker.CheckAsync();
+                exeDownloadUrl = result?.ExeDownloadUrl;
+            }
+
+            if (!string.IsNullOrWhiteSpace(exeDownloadUrl))
             {
                 GlobalUpdateNotification.Message = "Forced update initiated by administrator...";
                 GlobalUpdateNotification.IsOpen = true;
-            });
 
-            var batPath = await svcs.UpdateChecker.DownloadUpdateAsync(result.ExeDownloadUrl);
-            if (batPath != null)
-                UpdateService.ApplyUpdate(batPath);
+                var batPath = await svcs.UpdateChecker.DownloadUpdateAsync(exeDownloadUrl);
+                if (batPath != null)
+                    UpdateService.ApplyUpdate(batPath);
+            }
+        }
+        finally
+        {
+            _forceUpdateInProgress = false;
         }
     }
 

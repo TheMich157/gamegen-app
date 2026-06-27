@@ -56,7 +56,7 @@
                                         Spacing="10">
 
                                 <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <Border CornerRadius="999" Padding="10,4,14,4"
+                                    <Border CornerRadius="0" Padding="10,4,14,4"
                                             BorderThickness="1"
                                             BorderBrush="{StaticResource GameGenSubtleAccentStrokeBrush}"
                                             Background="{StaticResource GameGenSubtleAccentBackgroundBrush}">
@@ -72,7 +72,7 @@
                                     </Border>
 
                                     <Border x:Name="ComingSoonPill"
-                                            CornerRadius="999" Padding="10,4,14,4"
+                                            CornerRadius="0" Padding="10,4,14,4"
                                             BorderThickness="1"
                                             BorderBrush="#80FFB85B"
                                             Background="#33FFB85B"

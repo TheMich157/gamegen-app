@@ -682,7 +682,14 @@ public sealed partial class GameDetailsPage : Page
         Windows.Media.Playback.MediaPlayer? mp = null;
         try
         {
-            mp = new Windows.Media.Playback.MediaPlayer { AutoPlay = true, IsLoopingEnabled = false };
+            var startupBehavior = TypedApp.Svcs.SettingsStore.Load().GameDetailsVideoStartupBehavior;
+            var shouldStartPaused = startupBehavior == "paused";
+            mp = new Windows.Media.Playback.MediaPlayer
+            {
+                AutoPlay = !shouldStartPaused,
+                IsLoopingEnabled = false,
+                IsMuted = startupBehavior != "sound",
+            };
 
             // HLS / DASH need AdaptiveMediaSource; progressive mp4/webm use a plain URI.
             var isAdaptive = url.Contains(".m3u8", StringComparison.OrdinalIgnoreCase)
@@ -731,7 +738,8 @@ public sealed partial class GameDetailsPage : Page
             // Dispose any previous player from an earlier attempt before swapping in.
             if (_activePlayer != null && _activePlayer != mp) SafeDispose(_activePlayer);
             _activePlayer = mp;
-            mp.Play();
+            if (!shouldStartPaused)
+                mp.Play();
         }
         catch (OperationCanceledException)
         {

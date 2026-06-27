@@ -10,6 +10,7 @@ public sealed partial class SettingsPage : Page
 {
     private bool    _suppressDarkThemeToggle;
     private bool    _suppressDiscordPresenceToggle;
+    private bool    _suppressVideoStartupCombo;
     private string? _latestExeDownloadUrl;
     private string? _latestUpdaterBatPath;
 
@@ -24,6 +25,7 @@ public sealed partial class SettingsPage : Page
         base.OnNavigatedTo(e);
         SyncDarkThemeToggleFromStore();
         SyncDiscordPresenceToggleFromStore();
+        SyncVideoStartupComboFromStore();
     }
 
     private void SyncDarkThemeToggleFromStore()
@@ -38,6 +40,20 @@ public sealed partial class SettingsPage : Page
         _suppressDiscordPresenceToggle = true;
         DiscordPresenceToggle.IsOn = TypedApp.Svcs.SettingsStore.Load().DiscordRichPresenceDisabled;
         _suppressDiscordPresenceToggle = false;
+    }
+
+    private void SyncVideoStartupComboFromStore()
+    {
+        var behavior = TypedApp.Svcs.SettingsStore.Load().GameDetailsVideoStartupBehavior;
+
+        _suppressVideoStartupCombo = true;
+        VideoStartupCombo.SelectedIndex = behavior switch
+        {
+            "paused" => 1,
+            "sound" => 2,
+            _ => 0,
+        };
+        _suppressVideoStartupCombo = false;
     }
 
     private App TypedApp => (App)Application.Current;
@@ -188,6 +204,21 @@ public sealed partial class SettingsPage : Page
         cur.DiscordRichPresenceDisabled = DiscordPresenceToggle.IsOn;
         TypedApp.Svcs.SettingsStore.Save(cur);
         TypedApp.Svcs.DiscordPresence.Connect();
+    }
+
+    private void VideoStartupCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressVideoStartupCombo || VideoStartupCombo.SelectedItem is not ComboBoxItem item)
+            return;
+
+        var cur = TypedApp.Svcs.SettingsStore.Load();
+        cur.GameDetailsVideoStartupBehavior = item.Tag?.ToString() switch
+        {
+            "paused" => "paused",
+            "sound" => "sound",
+            _ => "muted",
+        };
+        TypedApp.Svcs.SettingsStore.Save(cur);
     }
 
     private void SaveGameGenSettings_Click(object sender, RoutedEventArgs e)

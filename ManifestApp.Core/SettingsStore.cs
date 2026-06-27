@@ -24,6 +24,7 @@ public sealed class SettingsStore
             // Re-apply defaults for fields that may be null in settings files saved before
             // the default was introduced (System.Text.Json restores explicit nulls from disk).
             s.AdminEndpointUrl ??= "https://gamegen.lol";
+            s.GameDetailsVideoStartupBehavior = NormalizeVideoStartupBehavior(s.GameDetailsVideoStartupBehavior);
             return s;
         }
         catch
@@ -39,4 +40,12 @@ public sealed class SettingsStore
             AppPaths.SettingsPath,
             JsonSerializer.Serialize(settings, JsonOptions));
     }
+
+    private static string NormalizeVideoStartupBehavior(string? value) =>
+        value?.Trim().ToLowerInvariant() switch
+        {
+            "paused" => "paused",
+            "sound" => "sound",
+            _ => "muted",
+        };
 }

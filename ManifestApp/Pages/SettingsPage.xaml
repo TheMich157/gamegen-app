@@ -91,6 +91,22 @@
                             Text="Requires the Discord desktop app. When hidden, GameGen stops updating your Discord status."
                             TextWrapping="WrapWholeWords" />
                     </StackPanel>
+
+                    <StackPanel Spacing="4">
+                        <ComboBox
+                            x:Name="VideoStartupCombo"
+                            Header="Game details videos"
+                            SelectionChanged="VideoStartupCombo_SelectionChanged">
+                            <ComboBoxItem Tag="muted" Content="Start muted" />
+                            <ComboBoxItem Tag="paused" Content="Start paused" />
+                            <ComboBoxItem Tag="sound" Content="Autoplay with sound" />
+                        </ComboBox>
+                        <TextBlock
+                            FontSize="12"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="Controls trailer playback when a game details page opens."
+                            TextWrapping="WrapWholeWords" />
+                    </StackPanel>
                 </StackPanel>
             </Border>
 

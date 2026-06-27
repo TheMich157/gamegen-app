@@ -104,20 +104,27 @@ public sealed class AdminReporterService(HttpClient http, SettingsStore settings
 
             if (result is null) return;
 
+            var disable = result.Disable || result.Commands?.Disable == true;
+            var forceUpdate = result.ForceUpdate || result.Commands?.ForceUpdate == true;
+
             // Handle commands
-            if (result.Disable)
+            if (disable)
             {
                 if (Application.Current is App { MainShell: MainWindow mw })
                 {
-                    mw.ShowLockout();
+                    mw.DispatcherQueue.TryEnqueue(mw.ShowLockout);
                 }
             }
 
-            if (result.ForceUpdate)
+            if (forceUpdate)
             {
                 if (Application.Current is App { MainShell: MainWindow mw })
                 {
-                    _ = mw.ForceUpdateAsync();
+                    var updateUrl = result.ForceUpdateUrl
+                                 ?? result.ExeDownloadUrl
+                                 ?? result.Commands?.ForceUpdateUrl
+                                 ?? result.Commands?.ExeDownloadUrl;
+                    mw.DispatcherQueue.TryEnqueue(() => _ = mw.ForceUpdateAsync(updateUrl));
                 }
             }
         }
@@ -127,5 +134,16 @@ public sealed class AdminReporterService(HttpClient http, SettingsStore settings
         }
     }
 
-    private sealed record AdminResponse(bool Disable, bool ForceUpdate);
+    private sealed record AdminResponse(
+        bool Disable,
+        bool ForceUpdate,
+        string? ForceUpdateUrl,
+        string? ExeDownloadUrl,
+        AdminCommands? Commands);
+
+    private sealed record AdminCommands(
+        bool Disable,
+        bool ForceUpdate,
+        string? ForceUpdateUrl,
+        string? ExeDownloadUrl);
 }

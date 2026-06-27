@@ -35,7 +35,7 @@
             <StackPanel Spacing="12">
 
                 <!-- Status pill -->
-                <Border CornerRadius="999" Padding="10,4,14,4"
+                <Border CornerRadius="0" Padding="10,4,14,4"
                         BorderThickness="1"
                         BorderBrush="{StaticResource GameGenSubtleAccentStrokeBrush}"
                         Background="{StaticResource GameGenSubtleAccentBackgroundBrush}"
@@ -348,7 +348,7 @@
                                             HorizontalAlignment="Right"
                                             VerticalAlignment="Top"
                                             Background="{ThemeResource AccentFillColorDefaultBrush}"
-                                            CornerRadius="{StaticResource ControlCornerRadius}"
+                                            CornerRadius="0"
                                             Visibility="{x:Bind IsConfigured, Mode=OneWay, Converter={StaticResource ManifestBoolToVisibility}}">
                                             <TextBlock
                                                 FontSize="10"
