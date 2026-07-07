@@ -265,10 +265,15 @@ public sealed partial class SettingsPage : Page
     {
         var paths = TypedApp.Svcs.PathsResolver;
 
-        var steam = paths.ResolveSteamInstall();
+        var steam = SteamPathBox.Text?.Trim();
+        if (string.IsNullOrEmpty(steam) || !System.IO.Directory.Exists(steam) || !System.IO.File.Exists(System.IO.Path.Combine(steam, "steam.exe")))
+        {
+            steam = paths.ResolveSteamInstall();
+        }
+
         if (string.IsNullOrEmpty(steam))
         {
-            SaveSettingsStatus.Visibility = Microsoft.UI.Xaml.Visibility.Visible;
+            SaveSettingsStatus.Visibility = Microsoft.UI.Visibility.Visible;
             SaveSettingsStatus.Text =
                 "Could not detect Steam. Set Steam install folder above, tap Save Steam settings, then try again.";
             return;
@@ -296,7 +301,12 @@ public sealed partial class SettingsPage : Page
     {
         var path = await PickFolderAsync(PickerLocationId.ComputerFolder);
         if (!string.IsNullOrEmpty(path))
+        {
             SteamPathBox.Text = path;
+            var paths = TypedApp.Svcs.PathsResolver;
+            PluginPathBox.Text = paths.DefaultStPluginFromSteamRoot(path) ?? "";
+            DepotPathBox.Text = paths.DefaultDepotCacheFromSteamRoot(path) ?? "";
+        }
     }
 
     private async void BrowsePlugin_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)

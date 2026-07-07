@@ -1,5 +1,14 @@
 # Changelog
 
+## [3.2.0] - 2026-07-07
+
+### Added
+- **Online Fixes Section** — Search, view, and directly download multiplayer fixes from the OnlineFix database. Supports local real-time search filtering and direct file downloads using a save file picker.
+- **Route Migration to V2** — Migrated the generation, request, and stats endpoints to the high-speed v2 API format with HTTP Bearer Token authorization.
+- **Auto-population of Settings Paths** — Selecting the Steam directory in Settings now automatically configures the default routes for the plugin directory (`config/stplug-in`) and depot cache directory (`config/depotcache`).
+
+---
+
 ## [3.1.1] - 2026-05-27
 
 ### Added

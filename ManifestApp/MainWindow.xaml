@@ -64,6 +64,11 @@
                             <FontIcon FontSize="16" Glyph="&#xE715;" />
                         </NavigationViewItem.Icon>
                     </NavigationViewItem>
+                    <NavigationViewItem Content="Online Fixes" Tag="online-fixes">
+                        <NavigationViewItem.Icon>
+                            <FontIcon FontSize="16" Glyph="&#xE774;" />
+                        </NavigationViewItem.Icon>
+                    </NavigationViewItem>
                 </NavigationView.MenuItems>
 
                 <NavigationView.PaneFooter>

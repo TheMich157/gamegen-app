@@ -420,6 +420,12 @@ public sealed partial class MainWindow : Window
             return;
         }
 
+        if (tag == "online-fixes")
+        {
+            NavFrame.Navigate(typeof(OnlineFixPage));
+            return;
+        }
+
         if (tag == "home")
             NavFrame.Navigate(typeof(HomePage), new HomeNavigationArgs(HomeLandingMode.StoreSearch));
     }

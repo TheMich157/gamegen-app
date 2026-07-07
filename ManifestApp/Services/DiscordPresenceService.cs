@@ -95,6 +95,11 @@ public sealed class DiscordPresenceService : IDisposable
     {
         SetPresence(PresenceDetails, $"{BrowsingPrefix} {displayNameTruncated}");
     }
+ 
+    public void NotifyBrowsingOnlineFixes()
+    {
+        SetPresence(PresenceDetails, "Browsing multiplayer fixes");
+    }
 
     private void SetPresence(string details, string? state = null)
     {

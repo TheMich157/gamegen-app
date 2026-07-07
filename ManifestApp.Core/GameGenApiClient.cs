@@ -1,4 +1,5 @@
 using System.Text.Json;
+using ManifestApp.Core.Models;
 
 namespace ManifestApp.Core;
 
@@ -16,13 +17,13 @@ public sealed class GameGenApiClient(HttpClient http, SettingsStore settingsStor
         if (string.IsNullOrWhiteSpace(apiKey))
             return GameGenZipResult.Fail("GameGen API key is empty. Add it in Settings.");
 
-        var keySeg      = Uri.EscapeDataString(apiKey.Trim());
-        var generateUrl = $"{GetApiRoot().TrimEnd('/')}/api/{keySeg}/generate/{appId}?format=zip";
+        var generateUrl = $"{GetApiRoot().TrimEnd('/')}/api/v2/generate/{appId}?format=zip";
 
         try
         {
             // Single API call — request ZIP directly so the server charges exactly one credit.
             using var req = new HttpRequestMessage(HttpMethod.Get, generateUrl);
+            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey.Trim());
             req.Headers.Accept.ParseAdd("application/zip, application/octet-stream, application/json");
             using var rsp =
                 await http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
@@ -231,8 +232,7 @@ public sealed class GameGenApiClient(HttpClient http, SettingsStore settingsStor
         if (string.IsNullOrWhiteSpace(apiKey))
             return GameGenRequestResult.Fail("API key is missing.");
 
-        var keySeg = Uri.EscapeDataString(apiKey.Trim());
-        var url    = $"{GetApiRoot().TrimEnd('/')}/api/{keySeg}/request/{appId}";
+        var url    = $"{GetApiRoot().TrimEnd('/')}/api/v2/request/{appId}";
 
         try
         {
@@ -245,6 +245,7 @@ public sealed class GameGenApiClient(HttpClient http, SettingsStore settingsStor
             {
                 Content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json"),
             };
+            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey.Trim());
             using var rsp = await http.SendAsync(req, ct).ConfigureAwait(false);
             var raw = await rsp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
 
@@ -268,19 +269,20 @@ public sealed class GameGenApiClient(HttpClient http, SettingsStore settingsStor
     // ── Stats ─────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// GET /api/{key}/stats — plan status and remaining daily credits.
+    /// GET /api/v2/user/stats — plan status and remaining daily credits.
     /// </summary>
     public async Task<GameGenStatsResult> GetStatsAsync(string apiKey, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(apiKey))
             return new GameGenStatsResult { Ok = false, ErrorMessage = "No API key." };
 
-        var keySeg = Uri.EscapeDataString(apiKey.Trim());
-        var url    = $"{GetApiRoot().TrimEnd('/')}/api/{keySeg}/stats";
+        var url    = $"{GetApiRoot().TrimEnd('/')}/api/v2/user/stats";
 
         try
         {
-            using var rsp = await http.GetAsync(url, ct).ConfigureAwait(false);
+            using var req = new HttpRequestMessage(HttpMethod.Get, url);
+            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey.Trim());
+            using var rsp = await http.SendAsync(req, ct).ConfigureAwait(false);
             var raw = await rsp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
 
             if (!rsp.IsSuccessStatusCode)
@@ -329,22 +331,33 @@ public sealed class GameGenApiClient(HttpClient http, SettingsStore settingsStor
                           (staffEl.ValueKind == System.Text.Json.JsonValueKind.String &&
                            bool.TryParse(staffEl.GetString(), out var sb) && sb);
 
-            // Credits/usage are nested under "usage": { today, limit, remaining, resetAt }
+            // Credits/usage are nested under "usage" or "quota"
             int?     usageToday  = null;
             string?  resetAt     = null;
 
-            if (root.TryGetProperty("usage", out var usage) &&
-                usage.ValueKind == System.Text.Json.JsonValueKind.Object)
+            var usageEl = root.TryGetProperty("usage", out var usage) && usage.ValueKind == System.Text.Json.JsonValueKind.Object
+                ? usage
+                : root.TryGetProperty("quota", out var quota) && quota.ValueKind == System.Text.Json.JsonValueKind.Object
+                    ? quota
+                    : default;
+
+            if (usageEl.ValueKind == System.Text.Json.JsonValueKind.Object)
             {
-                if (usage.TryGetProperty("remaining", out var rem) && rem.TryGetInt32(out var r))
+                if (usageEl.TryGetProperty("remaining", out var rem) && rem.TryGetInt32(out var r))
                     creditsRemaining = r;
-                if (usage.TryGetProperty("limit", out var lim) && lim.TryGetInt32(out var l))
+                if (usageEl.TryGetProperty("limit", out var lim) && lim.TryGetInt32(out var l))
                     creditsTotal = l;
-                if (usage.TryGetProperty("today", out var tod) && tod.TryGetInt32(out var t))
+                if (usageEl.TryGetProperty("today", out var tod) && tod.TryGetInt32(out var t))
                     usageToday = t;
-                if (usage.TryGetProperty("resetAt", out var rat) &&
-                    rat.ValueKind == System.Text.Json.JsonValueKind.String)
-                    resetAt = rat.GetString();
+                if (usageEl.TryGetProperty("used", out var usd) && usd.TryGetInt32(out var uToday))
+                    usageToday = uToday;
+                if (usageEl.TryGetProperty("resetAt", out var rat))
+                {
+                    if (rat.ValueKind == System.Text.Json.JsonValueKind.String)
+                        resetAt = rat.GetString();
+                    else if (rat.ValueKind == System.Text.Json.JsonValueKind.Number && rat.TryGetInt64(out var unix))
+                        resetAt = DateTimeOffset.FromUnixTimeSeconds(unix).ToString("O", System.Globalization.CultureInfo.InvariantCulture);
+                }
             }
             else
             {
@@ -378,6 +391,119 @@ public sealed class GameGenApiClient(HttpClient http, SettingsStore settingsStor
         catch (Exception ex)
         {
             return new GameGenStatsResult { Ok = false, ErrorMessage = ex.Message };
+        }
+    }
+
+    // ── OnlineFixes ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// GET /api/v2/onlinefix/list — retrieves the list of online multiplayer fixes.
+    /// </summary>
+    public async Task<List<OnlineFixItem>> GetOnlineFixesAsync(string apiKey, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(apiKey))
+            throw new ArgumentException("API key is missing.");
+
+        var url = $"{GetApiRoot().TrimEnd('/')}/api/v2/onlinefix/list";
+        using var req = new HttpRequestMessage(HttpMethod.Get, url);
+        req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey.Trim());
+
+        using var rsp = await http.SendAsync(req, ct).ConfigureAwait(false);
+        rsp.EnsureSuccessStatusCode();
+
+        var raw = await rsp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+        using var doc = JsonDocument.Parse(raw);
+        var root = doc.RootElement;
+
+        var list = new List<OnlineFixItem>();
+        JsonElement arrayEl = default;
+
+        if (root.ValueKind == JsonValueKind.Array)
+        {
+            arrayEl = root;
+        }
+        else if (root.ValueKind == JsonValueKind.Object)
+        {
+            // Try common wrapper properties
+            if (root.TryGetProperty("fixes", out var fEl) && fEl.ValueKind == JsonValueKind.Array)
+                arrayEl = fEl;
+            else if (root.TryGetProperty("data", out var dEl) && dEl.ValueKind == JsonValueKind.Array)
+                arrayEl = dEl;
+            else if (root.TryGetProperty("items", out var iEl) && iEl.ValueKind == JsonValueKind.Array)
+                arrayEl = iEl;
+            else if (root.TryGetProperty("results", out var rEl) && rEl.ValueKind == JsonValueKind.Array)
+                arrayEl = rEl;
+        }
+
+        if (arrayEl.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in arrayEl.EnumerateArray())
+            {
+                string? name = null;
+                string? title = null;
+                string? size = null;
+                string? version = null;
+
+                if (item.ValueKind == JsonValueKind.Object)
+                {
+                    if (item.TryGetProperty("name", out var nProp)) name = nProp.GetString();
+                    if (item.TryGetProperty("title", out var tProp)) title = tProp.GetString();
+                    if (item.TryGetProperty("displayName", out var dnProp)) title ??= dnProp.GetString();
+                    if (item.TryGetProperty("size", out var sProp)) size = sProp.GetString();
+                    if (item.TryGetProperty("version", out var vProp)) version = vProp.GetString();
+                }
+                else if (item.ValueKind == JsonValueKind.String)
+                {
+                    name = item.GetString();
+                }
+
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    list.Add(new OnlineFixItem
+                    {
+                        Name = name,
+                        Title = string.IsNullOrWhiteSpace(title) ? name : title,
+                        Size = size,
+                        Version = version
+                    });
+                }
+            }
+        }
+
+        return list;
+    }
+
+    /// <summary>
+    /// GET /api/v2/onlinefix/download/{name} — streams the direct zip download for a fix.
+    /// </summary>
+    public async Task DownloadOnlineFixAsync(string apiKey, string fixName, Stream destinationStream,
+        CancellationToken cancellationToken, IProgress<double>? progress = null)
+    {
+        if (string.IsNullOrWhiteSpace(apiKey))
+            throw new ArgumentException("API key is missing.");
+
+        var url = $"{GetApiRoot().TrimEnd('/')}/api/v2/onlinefix/download/{Uri.EscapeDataString(fixName)}";
+        
+        using var req = new HttpRequestMessage(HttpMethod.Get, url);
+        req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey.Trim());
+        req.Headers.Accept.ParseAdd("application/zip, application/octet-stream");
+
+        using var rsp = await http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+            .ConfigureAwait(false);
+        rsp.EnsureSuccessStatusCode();
+
+        var total = rsp.Content.Headers.ContentLength ?? -1L;
+        await using var src = await rsp.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+
+        var buf = new byte[81920];
+        long downloaded = 0;
+        int read;
+        while ((read = await src.ReadAsync(buf, cancellationToken).ConfigureAwait(false)) > 0)
+        {
+            await destinationStream.WriteAsync(buf.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+            downloaded += read;
+            if (total > 0 && progress != null)
+                progress.Report(downloaded * 100.0 / total);
         }
     }
 }
