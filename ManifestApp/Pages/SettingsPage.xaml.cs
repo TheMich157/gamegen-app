@@ -273,7 +273,7 @@ public sealed partial class SettingsPage : Page
 
         if (string.IsNullOrEmpty(steam))
         {
-            SaveSettingsStatus.Visibility = Microsoft.UI.Visibility.Visible;
+            SaveSettingsStatus.Visibility = Microsoft.UI.Xaml.Visibility.Visible;
             SaveSettingsStatus.Text =
                 "Could not detect Steam. Set Steam install folder above, tap Save Steam settings, then try again.";
             return;
