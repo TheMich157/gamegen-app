@@ -50,7 +50,14 @@ public sealed partial class MainWindow : Window
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico"));
 
         RootChrome.ActualThemeChanged += (_, _) => SyncCaptionButtonColors();
-        RootChrome.Loaded += (_, _) => SyncCaptionButtonColors();
+        RootChrome.Loaded += (_, _) =>
+        {
+            SyncCaptionButtonColors();
+            if (NavView.SettingsItem is NavigationViewItem settingsItem)
+            {
+                settingsItem.Content = "Settings";
+            }
+        };
         Activated += MainWindow_Activated;
 
         // Start background update checker
@@ -207,8 +214,11 @@ public sealed partial class MainWindow : Window
         {
             e.Cancel = true;
             AppWindow.Hide();
+            AppLogger.Log("Main window closed. Minimized to system tray.");
             return;
         }
+
+        AppLogger.Log("Main window closing. Starting clean application exit.");
 
         // Real exit: clean up tray, Discord, and background timers
         _statusPollTimer?.Stop();
@@ -217,6 +227,7 @@ public sealed partial class MainWindow : Window
         _trayIcon?.Dispose();
         _trayIcon = null;
         try { ((App)Application.Current).Svcs.DiscordPresence.Dispose(); } catch { /* ignore */ }
+        AppLogger.Log("Cleanup complete. Exit process.");
     }
 
     private void ShowFromTray()
@@ -231,12 +242,14 @@ public sealed partial class MainWindow : Window
         ShowFromTray();
         if (NavFrame.CurrentSourcePageType != typeof(SettingsPage))
             NavFrame.Navigate(typeof(SettingsPage));
+        NavView.SelectedItem = NavView.SettingsItem;
     }
 
     internal void NavigateToSettings()
     {
         if (NavFrame.CurrentSourcePageType != typeof(SettingsPage))
             NavFrame.Navigate(typeof(SettingsPage));
+        NavView.SelectedItem = NavView.SettingsItem;
     }
 
     /// <summary>
@@ -306,6 +319,7 @@ public sealed partial class MainWindow : Window
 
     internal void NavigateShell()
     {
+        AppLogger.Log("Initializing Shell. Navigating to Main UI.");
         UpdateUserActivity();
         ApplyThemeFromSettings();
 

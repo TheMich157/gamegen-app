@@ -62,9 +62,10 @@ public sealed partial class SettingsPage : Page
     {
         var s = TypedApp.Svcs.SettingsStore.Load();
 
-        SteamPathBox.Text = s.SteamInstallPathOverride ?? "";
-        PluginPathBox.Text = s.StPluginFolderOverride ?? "";
-        DepotPathBox.Text = s.DepotCacheFolderOverride ?? "";
+        var paths = TypedApp.Svcs.PathsResolver;
+        SteamPathBox.Text = s.SteamInstallPathOverride ?? paths.ResolveSteamInstall() ?? "";
+        PluginPathBox.Text = s.StPluginFolderOverride ?? paths.ResolveStPluginFolder() ?? "";
+        DepotPathBox.Text = s.DepotCacheFolderOverride ?? paths.ResolveDepotCacheFolder() ?? "";
         SteamToolsPathBox.Text = s.SteamToolsExeOverride ?? "";
 
         ApiKeyStatus.Text = GameGenApiKeyStore.TryRetrieve(out _)

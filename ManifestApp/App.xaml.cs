@@ -1,9 +1,15 @@
+using System;
+using System.Net.Http;
+using System.Threading;
 using Microsoft.UI.Xaml;
+using ManifestApp.Core;
 
 namespace ManifestApp;
 
 public partial class App : Application
 {
+    private static Mutex? _appMutex;
+
     internal AppServices Svcs { get; }
 
     /// <summary>Primary shell window — required for pickers and dialogs.</summary>
@@ -11,6 +17,14 @@ public partial class App : Application
 
     public App()
     {
+        // Force the app language to English to prevent mixed localizations of system-provided strings.
+        // Wrap in try-catch since unpackaged apps lack package identity and may throw on this API.
+        try
+        {
+            Windows.Globalization.ApplicationLanguages.PrimaryLanguageOverride = "en-US";
+        }
+        catch { /* ignore */ }
+
         // Single-file WASDK bootstrap: PRI/runtime layout resolves under the extraction/root dir.
         Environment.SetEnvironmentVariable(
             "MICROSOFT_WINDOWSAPPRUNTIME_BASE_DIRECTORY",
@@ -23,6 +37,16 @@ public partial class App : Application
         InitializeComponent();
 
         UnhandledException += (_, e) => LogCrash("App", e.Exception);
+
+        // Enforce single instance via named system Mutex
+        AppLogger.Log($"Application starting up. CommandLine: {Environment.CommandLine}");
+
+        _appMutex = new Mutex(true, "GameGenApp_SingleInstance_Mutex", out var isNewInstance);
+        if (!isNewInstance)
+        {
+            AppLogger.Log("Another instance of GameGen App is already running. Exiting current instance to prevent conflicts.", "WARNING");
+            Environment.Exit(0);
+        }
 
         Svcs = new AppServices(CreateHttpClient());
     }
@@ -37,6 +61,8 @@ public partial class App : Application
                 $"{ex?.StackTrace}{Environment.NewLine}{Environment.NewLine}");
         }
         catch { /* best-effort */ }
+
+        AppLogger.LogException(source, ex);
     }
 
     private static HttpClient CreateHttpClient()

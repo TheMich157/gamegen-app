@@ -154,13 +154,25 @@ public sealed partial class OnlineFixPage : Page
             return;
         }
 
-        // Configure save file picker
+        // Configure save file picker dynamically based on the server's extension (often .rar instead of .zip)
+        var ext = ".zip";
+        var filterLabel = "ZIP Archive";
+        if (!string.IsNullOrWhiteSpace(sel.FileName))
+        {
+            var detectedExt = System.IO.Path.GetExtension(sel.FileName);
+            if (!string.IsNullOrWhiteSpace(detectedExt))
+            {
+                ext = detectedExt.ToLowerInvariant();
+                filterLabel = ext == ".rar" ? "RAR Archive" : $"{ext.TrimStart('.').ToUpperInvariant()} Archive";
+            }
+        }
+
         var picker = new FileSavePicker
         {
             SuggestedStartLocation = PickerLocationId.Downloads,
-            SuggestedFileName = $"{sel.Name}.zip"
+            SuggestedFileName = !string.IsNullOrWhiteSpace(sel.FileName) ? sel.FileName : $"{sel.Name}{ext}"
         };
-        picker.FileTypeChoices.Add("ZIP Archive", new List<string> { ".zip" });
+        picker.FileTypeChoices.Add(filterLabel, new List<string> { ext });
 
         // Bind Window Handle to picker (required in WinUI 3)
         var hwnd = WindowInterop.GetWindowHandle(TypedApp.MainShell);

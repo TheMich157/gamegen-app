@@ -276,12 +276,11 @@ public sealed class GameGenApiClient(HttpClient http, SettingsStore settingsStor
         if (string.IsNullOrWhiteSpace(apiKey))
             return new GameGenStatsResult { Ok = false, ErrorMessage = "No API key." };
 
-        var url    = $"{GetApiRoot().TrimEnd('/')}/api/v2/user/stats";
+        var url    = $"{GetApiRoot().TrimEnd('/')}/api/{Uri.EscapeDataString(apiKey.Trim())}/stats";
 
         try
         {
             using var req = new HttpRequestMessage(HttpMethod.Get, url);
-            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey.Trim());
             using var rsp = await http.SendAsync(req, ct).ConfigureAwait(false);
             var raw = await rsp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
 
@@ -374,6 +373,21 @@ public sealed class GameGenApiClient(HttpClient http, SettingsStore settingsStor
                 }
             }
 
+            // Check for flat quota property (e.g. { "quota": 88 })
+            if (root.TryGetProperty("quota", out var quotaVal))
+            {
+                int? flatQuota = null;
+                if (quotaVal.ValueKind == JsonValueKind.Number)
+                    flatQuota = quotaVal.GetInt32();
+                else if (quotaVal.ValueKind == JsonValueKind.String && int.TryParse(quotaVal.GetString(), out var qInt))
+                    flatQuota = qInt;
+
+                if (flatQuota.HasValue && !creditsRemaining.HasValue)
+                {
+                    creditsRemaining = flatQuota.Value;
+                }
+            }
+
             return new GameGenStatsResult
             {
                 Ok               = true,
@@ -416,23 +430,53 @@ public sealed class GameGenApiClient(HttpClient http, SettingsStore settingsStor
         var root = doc.RootElement;
 
         var list = new List<OnlineFixItem>();
-        JsonElement arrayEl = default;
+        JsonElement arrayEl = FindArray(root);
 
-        if (root.ValueKind == JsonValueKind.Array)
+        static JsonElement FindArray(JsonElement element)
         {
-            arrayEl = root;
-        }
-        else if (root.ValueKind == JsonValueKind.Object)
-        {
-            // Try common wrapper properties
-            if (root.TryGetProperty("fixes", out var fEl) && fEl.ValueKind == JsonValueKind.Array)
-                arrayEl = fEl;
-            else if (root.TryGetProperty("data", out var dEl) && dEl.ValueKind == JsonValueKind.Array)
-                arrayEl = dEl;
-            else if (root.TryGetProperty("items", out var iEl) && iEl.ValueKind == JsonValueKind.Array)
-                arrayEl = iEl;
-            else if (root.TryGetProperty("results", out var rEl) && rEl.ValueKind == JsonValueKind.Array)
-                arrayEl = rEl;
+            if (element.ValueKind == JsonValueKind.Array)
+                return element;
+
+            if (element.ValueKind == JsonValueKind.Object)
+            {
+                // 1. Check preferred array properties at this level
+                var preferredKeys = new[] { "fixes", "data", "items", "results", "list" };
+                foreach (var key in preferredKeys)
+                {
+                    if (element.TryGetProperty(key, out var prop))
+                    {
+                        if (prop.ValueKind == JsonValueKind.Array)
+                            return prop;
+                    }
+                }
+
+                // 2. Check if a preferred object property exists and search inside it
+                var preferredObjects = new[] { "data", "fixes", "results" };
+                foreach (var key in preferredObjects)
+                {
+                    if (element.TryGetProperty(key, out var prop) && prop.ValueKind == JsonValueKind.Object)
+                    {
+                        var nested = FindArray(prop);
+                        if (nested.ValueKind == JsonValueKind.Array)
+                            return nested;
+                    }
+                }
+
+                // 3. Fallback: Search any child property for an array recursively
+                foreach (var prop in element.EnumerateObject())
+                {
+                    if (prop.Value.ValueKind == JsonValueKind.Array)
+                        return prop.Value;
+                    if (prop.Value.ValueKind == JsonValueKind.Object)
+                    {
+                        var nested = FindArray(prop.Value);
+                        if (nested.ValueKind == JsonValueKind.Array)
+                            return nested;
+                    }
+                }
+            }
+
+            return default;
         }
 
         if (arrayEl.ValueKind == JsonValueKind.Array)
@@ -443,14 +487,28 @@ public sealed class GameGenApiClient(HttpClient http, SettingsStore settingsStor
                 string? title = null;
                 string? size = null;
                 string? version = null;
+                string? fileName = null;
 
                 if (item.ValueKind == JsonValueKind.Object)
                 {
-                    if (item.TryGetProperty("name", out var nProp)) name = nProp.GetString();
+                    if (item.TryGetProperty("endpoint", out var epProp))
+                    {
+                        var epVal = epProp.GetString();
+                        if (!string.IsNullOrWhiteSpace(epVal))
+                        {
+                            var nameFromEp = epVal;
+                            if (nameFromEp.Contains('/'))
+                                nameFromEp = nameFromEp.Split('/').Last();
+                            name = nameFromEp;
+                        }
+                    }
+                    if (item.TryGetProperty("name", out var nProp)) name = nProp.GetString() ?? name;
                     if (item.TryGetProperty("title", out var tProp)) title = tProp.GetString();
                     if (item.TryGetProperty("displayName", out var dnProp)) title ??= dnProp.GetString();
                     if (item.TryGetProperty("size", out var sProp)) size = sProp.GetString();
+                    if (item.TryGetProperty("fileSize", out var fsProp)) size = fsProp.GetString() ?? size;
                     if (item.TryGetProperty("version", out var vProp)) version = vProp.GetString();
+                    if (item.TryGetProperty("fileName", out var fnProp)) fileName = fnProp.GetString();
                 }
                 else if (item.ValueKind == JsonValueKind.String)
                 {
@@ -464,7 +522,8 @@ public sealed class GameGenApiClient(HttpClient http, SettingsStore settingsStor
                         Name = name,
                         Title = string.IsNullOrWhiteSpace(title) ? name : title,
                         Size = size,
-                        Version = version
+                        Version = version,
+                        FileName = fileName
                     });
                 }
             }
