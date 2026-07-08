@@ -28,6 +28,9 @@ public sealed class AppSettings
     /// <summary>How trailer videos behave when a game details page opens: muted, paused, or sound.</summary>
     public string GameDetailsVideoStartupBehavior { get; set; } = "muted";
 
+    /// <summary>Whether to automatically trigger Steam installation and extract online fix after generating manifest.</summary>
+    public bool AutoInstallOnlineFix { get; set; }
+
     /// <summary>
     /// Base URL for the report endpoint. Defaults to the main GameGen server.
     /// Leave empty to disable telemetry reporting entirely.

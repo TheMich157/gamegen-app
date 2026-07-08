@@ -107,6 +107,19 @@
                             Text="Controls trailer playback when a game details page opens."
                             TextWrapping="WrapWholeWords" />
                     </StackPanel>
+                    <StackPanel Spacing="4">
+                        <ToggleSwitch
+                            x:Name="AutoInstallOnlineFixToggle"
+                            Header="Auto-install Steam game and online fix"
+                            OffContent="Manual"
+                            OnContent="Automatic"
+                            Toggled="AutoInstallOnlineFixToggle_Toggled" />
+                        <TextBlock
+                            FontSize="12"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="Automatically triggers the Steam download after generating a manifest, waits for it to finish, and installs the matching online fix zip directly into the game folder."
+                            TextWrapping="WrapWholeWords" />
+                    </StackPanel>
                 </StackPanel>
             </Border>
 

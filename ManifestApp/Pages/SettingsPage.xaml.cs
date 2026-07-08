@@ -11,6 +11,7 @@ public sealed partial class SettingsPage : Page
     private bool    _suppressDarkThemeToggle;
     private bool    _suppressDiscordPresenceToggle;
     private bool    _suppressVideoStartupCombo;
+    private bool    _suppressAutoInstallToggle;
     private string? _latestExeDownloadUrl;
     private string? _latestUpdaterBatPath;
 
@@ -26,6 +27,7 @@ public sealed partial class SettingsPage : Page
         SyncDarkThemeToggleFromStore();
         SyncDiscordPresenceToggleFromStore();
         SyncVideoStartupComboFromStore();
+        SyncAutoInstallToggleFromStore();
     }
 
     private void SyncDarkThemeToggleFromStore()
@@ -54,6 +56,13 @@ public sealed partial class SettingsPage : Page
             _ => 0,
         };
         _suppressVideoStartupCombo = false;
+    }
+
+    private void SyncAutoInstallToggleFromStore()
+    {
+        _suppressAutoInstallToggle = true;
+        AutoInstallOnlineFixToggle.IsOn = TypedApp.Svcs.SettingsStore.Load().AutoInstallOnlineFix;
+        _suppressAutoInstallToggle = false;
     }
 
     private App TypedApp => (App)Application.Current;
@@ -219,6 +228,16 @@ public sealed partial class SettingsPage : Page
             "sound" => "sound",
             _ => "muted",
         };
+        TypedApp.Svcs.SettingsStore.Save(cur);
+    }
+
+    private void AutoInstallOnlineFixToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_suppressAutoInstallToggle)
+            return;
+
+        var cur = TypedApp.Svcs.SettingsStore.Load();
+        cur.AutoInstallOnlineFix = AutoInstallOnlineFixToggle.IsOn;
         TypedApp.Svcs.SettingsStore.Save(cur);
     }
 

@@ -11,6 +11,9 @@ using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.UI.Xaml.Navigation;
 using Windows.Media.Core;
 using Windows.UI;
+using System.IO.Compression;
+using SharpCompress.Archives;
+using SharpCompress.Common;
 
 namespace ManifestApp.Pages;
 
@@ -942,6 +945,129 @@ public sealed partial class GameDetailsPage : Page
             outcome.Message);
     }
 
+    private async Task RunAutoInstallFlowAsync(string apiKey)
+    {
+        try
+        {
+            Status($"Triggering Steam install for {_displayName}...", InfoBarSeverity.Informational);
+            
+            // 1. Launch steam://install/{appId}
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = $"steam://install/{_appId}",
+                UseShellExecute = true,
+            });
+
+            SetInstallProgressIndeterminate("Waiting for Steam download to finish...");
+
+            // 2. Wait for download
+            using var monitorCts = new CancellationTokenSource();
+            var monitor = new SteamGameMonitor(TypedApp.Svcs.SettingsStore);
+            // Wait up to 10 hours for a large download? Just let it run until cancelled by navigating away
+            var gameInstallDir = await monitor.WaitForInstallationAsync(_appId, monitorCts.Token);
+
+            if (string.IsNullOrEmpty(gameInstallDir))
+            {
+                Status("Steam installation was not detected or failed.", InfoBarSeverity.Error);
+                return;
+            }
+
+            SetInstallProgressIndeterminate("Fetching matching online fix...");
+
+            // 3. Find matching online fix
+            var fixes = await TypedApp.Svcs.GameGenApi.GetOnlineFixesAsync(apiKey, CancellationToken.None);
+            
+            // Clean up name for matching (e.g. remove non-alphanumeric)
+            var searchName = new string(_displayName.Where(char.IsLetterOrDigit).ToArray());
+            
+            var targetFix = fixes.FirstOrDefault(f => 
+                new string(f.Title.Where(char.IsLetterOrDigit).ToArray()).Contains(searchName, StringComparison.OrdinalIgnoreCase) ||
+                new string(f.Name.Where(char.IsLetterOrDigit).ToArray()).Contains(searchName, StringComparison.OrdinalIgnoreCase)
+            );
+
+            if (targetFix == null)
+            {
+                Status($"Game downloaded, but no matching online fix found for {_displayName}.", InfoBarSeverity.Warning);
+                return;
+            }
+
+            SetInstallProgressIndeterminate($"Downloading fix: {targetFix.Title}...");
+
+            // 4. Download and extract fix
+            var downloadProgress = new Progress<double>(pct =>
+            {
+                if (InstallProgressRing.Visibility == Visibility.Visible)
+                {
+                    InstallProgressRing.IsActive   = false;
+                    InstallProgressRing.Visibility = Visibility.Collapsed;
+                    InstallProgressBar.Visibility  = Visibility.Visible;
+                }
+                InstallProgressBar.Value = pct;
+                InstallProgressText.Text = $"Downloading Fix… {pct:0}%";
+            });
+
+            using var ms = new MemoryStream();
+            await TypedApp.Svcs.GameGenApi.DownloadOnlineFixAsync(apiKey, targetFix.Name, ms, CancellationToken.None, downloadProgress);
+            ms.Position = 0;
+
+            SetInstallProgressIndeterminate("Extracting online fix to game folder...");
+
+            // Extract the archive (supports .zip and .rar) to gameInstallDir
+            using var archive = SharpCompress.Archives.ArchiveFactory.OpenArchive(ms);
+            
+            // 1. Analyze entries to find common root folder
+            var allFileKeys = archive.Entries.Where(e => !e.IsDirectory && !string.IsNullOrEmpty(e.Key)).Select(e => e.Key.Replace('\\', '/')).ToList();
+            string? commonRoot = null;
+            if (allFileKeys.Count > 0)
+            {
+                var firstKeyParts = allFileKeys[0].Split('/');
+                if (firstKeyParts.Length > 1)
+                {
+                    var potentialRoot = firstKeyParts[0] + "/";
+                    if (allFileKeys.All(k => k.StartsWith(potentialRoot)))
+                    {
+                        commonRoot = potentialRoot;
+                    }
+                }
+            }
+
+            foreach (var entry in archive.Entries)
+            {
+                if (entry.IsDirectory || string.IsNullOrEmpty(entry.Key)) continue;
+
+                var entryKey = entry.Key.Replace('\\', '/');
+                if (commonRoot != null && entryKey.StartsWith(commonRoot))
+                {
+                    entryKey = entryKey.Substring(commonRoot.Length);
+                }
+                
+                if (string.IsNullOrEmpty(entryKey)) continue;
+
+                var targetPath = System.IO.Path.Combine(gameInstallDir, entryKey.Replace('/', System.IO.Path.DirectorySeparatorChar));
+                var targetDir = System.IO.Path.GetDirectoryName(targetPath);
+                if (!string.IsNullOrEmpty(targetDir) && !System.IO.Directory.Exists(targetDir))
+                {
+                    System.IO.Directory.CreateDirectory(targetDir);
+                }
+
+                entry.WriteToFile(targetPath, new SharpCompress.Common.ExtractionOptions()
+                {
+                    Overwrite = true
+                });
+            }
+
+            Status($"Successfully installed {_displayName} and its online fix!", InfoBarSeverity.Success);
+        }
+        catch (Exception ex)
+        {
+            Status($"Auto-install flow failed: {ex.Message}", InfoBarSeverity.Error);
+        }
+        finally
+        {
+            HideInstallProgress();
+        }
+    }
+
     // ── Install ──────────────────────────────────────────────────────────────
 
     private async void Install_Click(object sender, RoutedEventArgs e)
@@ -1035,6 +1161,11 @@ public sealed partial class GameDetailsPage : Page
             await OfferSteamGracefulRestartAfterMutationAsync(
                 "Manifest files were installed. Restart Steam now so it reloads stplug-in and depotcache changes.",
                 "Restart Steam yourself when convenient so depot and plugin layouts reload.");
+
+            if (TypedApp.Svcs.SettingsStore.Load().AutoInstallOnlineFix)
+            {
+                await RunAutoInstallFlowAsync(apiKey.Trim());
+            }
         }
         catch (OperationCanceledException)
         {
