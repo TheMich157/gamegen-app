@@ -32,10 +32,10 @@ public sealed class AppSettings
     public bool AutoInstallOnlineFix { get; set; }
 
     /// <summary>
-    /// Base URL for the report endpoint. Defaults to the main GameGen server.
-    /// Leave empty to disable telemetry reporting entirely.
+    /// Base URL for the report endpoint. Leave empty or null to disable telemetry reporting entirely.
+    /// When set, defaults to the main GameGen server at first use via Settings UI only.
     /// </summary>
-    public string? AdminEndpointUrl { get; set; } = "https://gamegen.lol";
+    public string? AdminEndpointUrl { get; set; }
 
     /// <summary>
     /// Stable per-machine identifier generated on first launch and persisted here.

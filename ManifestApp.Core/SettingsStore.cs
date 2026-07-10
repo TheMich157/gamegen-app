@@ -21,9 +21,6 @@ public sealed class SettingsStore
         {
             var json = File.ReadAllText(AppPaths.SettingsPath);
             var s = JsonSerializer.Deserialize<AppSettings>(json, JsonOptions) ?? new AppSettings();
-            // Re-apply defaults for fields that may be null in settings files saved before
-            // the default was introduced (System.Text.Json restores explicit nulls from disk).
-            s.AdminEndpointUrl ??= "https://gamegen.lol";
             s.GameDetailsVideoStartupBehavior = NormalizeVideoStartupBehavior(s.GameDetailsVideoStartupBehavior);
             return s;
         }

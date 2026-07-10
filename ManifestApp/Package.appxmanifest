@@ -22,9 +22,9 @@
 
     Name="5713DCBE-2F04-4FF8-8023-2F20E61D7766"
 
-    Publisher="CN=AppPublisher"
+    Publisher="CN=GameGen"
 
-    Version="3.2.1.0" />
+    Version="3.2.2.0" />
 
 
 
@@ -36,7 +36,7 @@
 
     <DisplayName>GameGen App</DisplayName>
 
-    <PublisherDisplayName>AppPublisher</PublisherDisplayName>
+    <PublisherDisplayName>GameGen</PublisherDisplayName>
 
     <Logo>Assets\StoreLogo.png</Logo>
 
@@ -74,7 +74,7 @@
 
         DisplayName="GameGen App"
 
-        Description="GameGen App — Steam manifests &amp; storefront search"
+        Description="GameGen App - Steam manifests &amp; storefront search"
 
         BackgroundColor="transparent"
 

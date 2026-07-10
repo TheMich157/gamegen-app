@@ -26,7 +26,7 @@ Registers a machine on startup, returns user identity and current usage quota in
 {
   "machineId": "a3f8c1d2e4b5...",
   "os": "Windows 11 Pro (Build 22631.3737)",
-  "version": "1.4.5"
+  "version": "3.2.1"
 }
 ```
 
@@ -74,7 +74,7 @@ Registers a machine on startup, returns user identity and current usage quota in
 
 ### POST `/api/report`
 
-Receives heartbeats and user-action events from the desktop client every 5 minutes and on key actions (startup, install, remove, search). The server responds with any queued admin commands for that API key.
+Receives heartbeats and user-action events from the desktop client every 30 seconds and on key actions (startup, install, remove, search). The server responds with any queued admin commands for that API key.
 
 **Request body**
 
@@ -82,7 +82,7 @@ Receives heartbeats and user-action events from the desktop client every 5 minut
 {
   "sessionId": "e8a1f3c9d2b4...",
   "apiKey": "gg_live_xxx",
-  "appVersion": "1.4.5",
+  "appVersion": "3.2.1",
   "user": {
     "discordId": "123456789012345678",
     "username": "pokem",
@@ -112,7 +112,7 @@ Receives heartbeats and user-action events from the desktop client every 5 minut
 | Value | When sent |
 |-------|-----------|
 | `startup` | App launch |
-| `heartbeat` | Every 5 minutes while running |
+| `heartbeat` | Every 30 seconds while running |
 | `install` | After a manifest install (`appId`, `gameName`, `success` populated) |
 | `remove` | After a depot remove (`appId`, `gameName` populated) |
 | `search` | After a game search (`detail` = query string) |
@@ -177,7 +177,7 @@ Returns all tracked client sessions.
     {
       "sessionId": "e8a1f3c9d2b4...",
       "apiKey": "gg_live_xxx",
-      "appVersion": "1.4.5",
+      "appVersion": "3.2.1",
       "online": true,
       "lastSeen": "2024-05-10T14:32:00.000Z",
       "user": {

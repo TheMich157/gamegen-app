@@ -13,6 +13,7 @@ public sealed partial class SettingsPage : Page
     private bool    _suppressVideoStartupCombo;
     private bool    _suppressAutoInstallToggle;
     private string? _latestExeDownloadUrl;
+    private string? _latestExeSha256Hex;
     private string? _latestUpdaterBatPath;
 
     public SettingsPage()
@@ -88,6 +89,7 @@ public sealed partial class SettingsPage : Page
         if (startupResult?.IsUpdateAvailable == true && !UpdateInfoBar.IsOpen)
         {
             _latestExeDownloadUrl = startupResult.ExeDownloadUrl;
+            _latestExeSha256Hex   = startupResult.ExeSha256Hex;
             UpdateInfoBar.Severity = InfoBarSeverity.Informational;
             UpdateInfoBar.Title    = $"Update available — v{startupResult.LatestVersion.ToString(3)}";
             UpdateInfoBar.Message  = $"You're on v{startupResult.CurrentVersion.ToString(3)}. Click Install to download and apply.";
@@ -103,6 +105,7 @@ public sealed partial class SettingsPage : Page
         InstallUpdateButton.Visibility = Visibility.Collapsed;
         UpdateInfoBar.IsOpen = false;
         _latestExeDownloadUrl = null;
+        _latestExeSha256Hex   = null;
         _latestUpdaterBatPath = null;
 
         try
@@ -121,6 +124,7 @@ public sealed partial class SettingsPage : Page
                 UpdateInfoBar.Title   = $"Update available — v{result.LatestVersion.ToString(3)}";
                 UpdateInfoBar.Message = $"You're on v{result.CurrentVersion.ToString(3)}. Click Install to download and apply.";
                 _latestExeDownloadUrl = result.ExeDownloadUrl;
+                _latestExeSha256Hex   = result.ExeSha256Hex;
                 InstallUpdateButton.Visibility = Visibility.Visible;
             }
             else
@@ -164,7 +168,7 @@ public sealed partial class SettingsPage : Page
         });
 
         var batPath = await TypedApp.Svcs.UpdateChecker.DownloadUpdateAsync(
-            _latestExeDownloadUrl, progress);
+            _latestExeDownloadUrl, progress, _latestExeSha256Hex);
 
         if (batPath is null)
         {

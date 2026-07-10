@@ -119,7 +119,9 @@ public sealed partial class MainWindow : Window
         var result = svcs.StartupUpdateResult;
         if (result?.ExeDownloadUrl != null)
         {
-            var batPath = await svcs.UpdateChecker.DownloadUpdateAsync(result.ExeDownloadUrl);
+            var batPath = await svcs.UpdateChecker.DownloadUpdateAsync(
+                result.ExeDownloadUrl,
+                expectedSha256Hex: result.ExeSha256Hex);
             if (batPath != null)
                 UpdateService.ApplyUpdate(batPath);
         }
@@ -161,19 +163,6 @@ public sealed partial class MainWindow : Window
             if (result?.IsUpdateAvailable == true)
             {
                 svcs.StartupUpdateResult = result;
-
-                if (!string.IsNullOrEmpty(result.ExeDownloadUrl))
-                {
-                    Splash.SetStep(SplashOverlay.SplashStep.CheckUpdates, SplashOverlay.StepState.Active, $"Downloading update v{result.LatestVersion}...");
-                    var batPath = await svcs.UpdateChecker.DownloadUpdateAsync(result.ExeDownloadUrl);
-                    if (batPath != null)
-                    {
-                        Splash.SetStep(SplashOverlay.SplashStep.CheckUpdates, SplashOverlay.StepState.Done, "Installing update...");
-                        await Task.Delay(500);
-                        UpdateService.ApplyUpdate(batPath);
-                        return; // App will restart
-                    }
-                }
             }
 
             Splash.SetStep(SplashOverlay.SplashStep.CheckUpdates, SplashOverlay.StepState.Done,
@@ -649,9 +638,18 @@ public sealed partial class MainWindow : Window
                 GlobalUpdateNotification.Message = "Forced update initiated by administrator...";
                 GlobalUpdateNotification.IsOpen = true;
 
-                var batPath = await svcs.UpdateChecker.DownloadUpdateAsync(exeDownloadUrl);
+                var checkResult = await svcs.UpdateChecker.CheckAsync();
+                var batPath = await svcs.UpdateChecker.DownloadUpdateAsync(
+                    exeDownloadUrl,
+                    expectedSha256Hex: checkResult?.ExeSha256Hex);
                 if (batPath != null)
                     UpdateService.ApplyUpdate(batPath);
+                else
+                {
+                    GlobalUpdateNotification.Severity = Microsoft.UI.Xaml.Controls.InfoBarSeverity.Error;
+                    GlobalUpdateNotification.Message = "Forced update failed — download URL rejected or integrity check failed.";
+                    GlobalUpdateNotification.IsOpen = true;
+                }
             }
         }
         finally

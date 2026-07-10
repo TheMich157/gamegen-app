@@ -55,6 +55,12 @@ public sealed class GameGenApiClient(HttpClient http, SettingsStore settingsStor
                     try
                     {
                         var resolved = AbsoluteUrl(generateUrl, dl!);
+                        if (!TrustedDownloadUrl.IsAllowedGameGenCdn(resolved, GetApiRoot()))
+                        {
+                            return GameGenZipResult.Fail(
+                                "GameGen returned a download URL from an untrusted host.");
+                        }
+
                         var zipBytes = await DownloadBytesAsync(resolved, cancellationToken, progress)
                             .ConfigureAwait(false);
                         return LooksLikeZip(zipBytes)
@@ -269,7 +275,7 @@ public sealed class GameGenApiClient(HttpClient http, SettingsStore settingsStor
     // ── Stats ─────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// GET /api/v2/user/stats — plan status and remaining daily credits.
+    /// GET /api/{key}/stats — plan status and remaining daily credits (v1 endpoint).
     /// </summary>
     public async Task<GameGenStatsResult> GetStatsAsync(string apiKey, CancellationToken ct)
     {

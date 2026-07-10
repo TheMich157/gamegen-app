@@ -54,6 +54,7 @@
                 <!-- Soft glow behind logo -->
                 <Ellipse x:Name="LogoGlow"
                          Width="170" Height="170"
+                         HorizontalAlignment="Center" VerticalAlignment="Center"
                          IsHitTestVisible="False"
                          RenderTransformOrigin="0.5,0.5">
                     <Ellipse.Fill>
@@ -71,6 +72,7 @@
 
                 <!-- Outer dashed ring (slow CW) -->
                 <Ellipse Width="208" Height="208"
+                         HorizontalAlignment="Center" VerticalAlignment="Center"
                          Stroke="#506E45FF" StrokeThickness="1.5"
                          StrokeDashArray="2,4"
                          RenderTransformOrigin="0.5,0.5">
@@ -81,6 +83,7 @@
 
                 <!-- Middle ring with gradient stroke (fast CCW) -->
                 <Ellipse Width="172" Height="172"
+                         HorizontalAlignment="Center" VerticalAlignment="Center"
                          StrokeThickness="2"
                          StrokeDashArray="4,18"
                          RenderTransformOrigin="0.5,0.5">
@@ -97,6 +100,7 @@
 
                 <!-- Inner thin ring (medium CW) -->
                 <Ellipse Width="142" Height="142"
+                         HorizontalAlignment="Center" VerticalAlignment="Center"
                          Stroke="#80B8C8FF" StrokeThickness="1.2"
                          StrokeDashArray="1,3"
                          RenderTransformOrigin="0.5,0.5">

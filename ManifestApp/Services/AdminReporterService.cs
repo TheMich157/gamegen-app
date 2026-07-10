@@ -49,7 +49,7 @@ public sealed class AdminReporterService(HttpClient http, SettingsStore settings
     {
         var endpoint = settingsStore.Load().AdminEndpointUrl?.Trim().TrimEnd('/');
         if (string.IsNullOrEmpty(endpoint))
-            endpoint = "https://gamegen.lol";
+            return;
 
         var stats = _cachedStats;
         var key   = _cachedApiKey ?? "";

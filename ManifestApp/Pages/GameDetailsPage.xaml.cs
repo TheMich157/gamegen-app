@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using ManifestApp.Core;
+using ManifestApp.Core.Models;
 using ManifestApp.Services;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
@@ -12,8 +13,6 @@ using Microsoft.UI.Xaml.Navigation;
 using Windows.Media.Core;
 using Windows.UI;
 using System.IO.Compression;
-using SharpCompress.Archives;
-using SharpCompress.Common;
 
 namespace ManifestApp.Pages;
 
@@ -42,6 +41,10 @@ public sealed partial class GameDetailsPage : Page
     /// used to highlight the active thumb when navigation moves.</summary>
     private readonly List<Border> _thumbBorders = new();
 
+    private OnlineFixItem? _availableFix;
+    private bool _fixOperationInProgress;
+    private bool _installInProgress;
+
     private const double ThumbTileWidth   = 160;
     private const double ThumbTileSpacing = 8;
     private const double ThumbTileStride  = ThumbTileWidth + ThumbTileSpacing;
@@ -68,10 +71,13 @@ public sealed partial class GameDetailsPage : Page
         UpdateActionButtons();
         LoadTrackedFilesSummary();
 
+        _availableFix = null;
+
         TypedApp.Svcs.DiscordPresence.NotifyBrowsingGame(TruncateForDiscord(_displayName));
 
         _loadCts = new CancellationTokenSource();
         _ = LoadDetailsAsync(_loadCts.Token);
+        _ = CheckFixAvailabilityAsync(_loadCts.Token);
     }
 
     protected override void OnNavigatedFrom(NavigationEventArgs e)
@@ -834,8 +840,12 @@ public sealed partial class GameDetailsPage : Page
 
     private void UpdateActionButtons()
     {
-        InstallButton.IsEnabled = !_isConfigured;
-        RemoveButton.IsEnabled  = _isConfigured;
+        InstallButton.IsEnabled = !_isConfigured && !_fixOperationInProgress;
+        RemoveButton.IsEnabled  = _isConfigured && !_fixOperationInProgress;
+        FixAvailableButton.Visibility = _availableFix != null ? Visibility.Visible : Visibility.Collapsed;
+        FixAvailableButton.IsEnabled  = !_fixOperationInProgress;
+        LaunchSteamButton.IsEnabled   = !_fixOperationInProgress;
+        RestartSteamButton.IsEnabled  = !_fixOperationInProgress;
     }
 
     private void LoadTrackedFilesSummary()
@@ -884,7 +894,7 @@ public sealed partial class GameDetailsPage : Page
             DefaultButton   = ContentDialogButton.Close,
             XamlRoot        = XamlRoot!,
         };
-        await dlg.ShowAsync();
+        await DialogService.ShowAsync(dlg);
     }
 
     private async Task<bool> ChooseContinueAnywayAsync(
@@ -899,7 +909,7 @@ public sealed partial class GameDetailsPage : Page
             DefaultButton     = ContentDialogButton.Primary,
             XamlRoot          = XamlRoot!,
         };
-        return await dlg.ShowAsync() == ContentDialogResult.Secondary;
+        return await DialogService.ShowAsync(dlg) == ContentDialogResult.Secondary;
     }
 
     private async Task<bool> AskRestartSteamNowAsync(string explanation)
@@ -913,7 +923,7 @@ public sealed partial class GameDetailsPage : Page
             DefaultButton     = ContentDialogButton.Primary,
             XamlRoot          = XamlRoot!,
         };
-        return await dlg.ShowAsync() == ContentDialogResult.Primary;
+        return await DialogService.ShowAsync(dlg) == ContentDialogResult.Primary;
     }
 
     private async Task OfferSteamGracefulRestartAfterMutationAsync(string explanation, string deferReminder)
@@ -945,13 +955,130 @@ public sealed partial class GameDetailsPage : Page
             outcome.Message);
     }
 
+    // ── Online fix ───────────────────────────────────────────────────────────
+
+    private async Task CheckFixAvailabilityAsync(CancellationToken ct)
+    {
+        try
+        {
+            if (!GameGenApiKeyStore.TryRetrieve(out var apiKey) || string.IsNullOrWhiteSpace(apiKey))
+                return;
+
+            var fixes = await TypedApp.Svcs.GameGenApi.GetOnlineFixesAsync(apiKey.Trim(), ct)
+                .ConfigureAwait(true);
+            if (ct.IsCancellationRequested) return;
+
+            _availableFix = OnlineFixMatcher.FindMatch(fixes, _displayName);
+            UpdateActionButtons();
+        }
+        catch (OperationCanceledException)
+        {
+            // Page navigated away.
+        }
+        catch
+        {
+            // Fix availability is optional UI — never block the page.
+        }
+    }
+
+    private async Task<string?> ResolveGameInstallDirAsync()
+    {
+        var monitor = new SteamGameMonitor(TypedApp.Svcs.SettingsStore);
+        return await Task.FromResult(monitor.TryGetInstalledGamePath(_appId)).ConfigureAwait(true);
+    }
+
+    private async Task<bool> DownloadAndApplyFixAsync(string apiKey, OnlineFixItem fix, string gameInstallDir)
+    {
+        var downloadProgress = new Progress<double>(pct =>
+        {
+            if (InstallProgressRing.Visibility == Visibility.Visible)
+            {
+                InstallProgressRing.IsActive   = false;
+                InstallProgressRing.Visibility = Visibility.Collapsed;
+                InstallProgressBar.Visibility  = Visibility.Visible;
+            }
+            InstallProgressBar.Value = pct;
+            InstallProgressText.Text = $"Downloading fix… {pct:0}%";
+        });
+
+        using var ms = new MemoryStream();
+        await TypedApp.Svcs.GameGenApi
+            .DownloadOnlineFixAsync(apiKey, fix.Name, ms, CancellationToken.None, downloadProgress)
+            .ConfigureAwait(true);
+        ms.Position = 0;
+
+        SetInstallProgressIndeterminate("Extracting online fix to game folder...");
+        OnlineFixService.ExtractArchive(ms, gameInstallDir);
+        return true;
+    }
+
+    private async void FixAvailable_Click(object sender, RoutedEventArgs e)
+    {
+        if (_availableFix == null || _fixOperationInProgress) return;
+
+        if (!GameGenApiKeyStore.TryRetrieve(out var apiKey) || string.IsNullOrWhiteSpace(apiKey))
+        {
+            Status("API key missing — open Settings to add your GameGen key.", InfoBarSeverity.Warning);
+            return;
+        }
+
+        _fixOperationInProgress = true;
+        UpdateActionButtons();
+        SetInstallProgressIndeterminate("Checking game install folder…");
+
+        try
+        {
+            var gameInstallDir = await ResolveGameInstallDirAsync().ConfigureAwait(true);
+            if (string.IsNullOrEmpty(gameInstallDir))
+            {
+                var installViaSteam = await AskInstallViaSteamAsync().ConfigureAwait(true);
+                if (!installViaSteam) return;
+
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = $"steam://install/{_appId}",
+                    UseShellExecute = true,
+                });
+                Status("Install the game in Steam, then press Fix available again.", InfoBarSeverity.Informational);
+                return;
+            }
+
+            SetInstallProgressIndeterminate($"Downloading fix: {_availableFix.Title}…");
+            await DownloadAndApplyFixAsync(apiKey.Trim(), _availableFix, gameInstallDir).ConfigureAwait(true);
+            Status($"Online fix installed for {_displayName}.", InfoBarSeverity.Success);
+        }
+        catch (Exception ex)
+        {
+            Status($"Online fix failed: {ex.Message}", InfoBarSeverity.Error);
+        }
+        finally
+        {
+            _fixOperationInProgress = false;
+            HideInstallProgress();
+            UpdateActionButtons();
+        }
+    }
+
+    private async Task<bool> AskInstallViaSteamAsync()
+    {
+        var dlg = new ContentDialog
+        {
+            Title             = "Game not installed",
+            Content           = $"{_displayName} is not installed in Steam yet.\n\nInstall it via Steam first, then return here to apply the online fix.",
+            PrimaryButtonText = "Install via Steam",
+            CloseButtonText   = "Cancel",
+            DefaultButton     = ContentDialogButton.Primary,
+            XamlRoot          = XamlRoot!,
+        };
+        return await DialogService.ShowAsync(dlg) == ContentDialogResult.Primary;
+    }
+
     private async Task RunAutoInstallFlowAsync(string apiKey)
     {
         try
         {
             Status($"Triggering Steam install for {_displayName}...", InfoBarSeverity.Informational);
-            
-            // 1. Launch steam://install/{appId}
+
             Process.Start(new ProcessStartInfo
             {
                 FileName = $"steam://install/{_appId}",
@@ -960,10 +1087,8 @@ public sealed partial class GameDetailsPage : Page
 
             SetInstallProgressIndeterminate("Waiting for Steam download to finish...");
 
-            // 2. Wait for download
             using var monitorCts = new CancellationTokenSource();
             var monitor = new SteamGameMonitor(TypedApp.Svcs.SettingsStore);
-            // Wait up to 10 hours for a large download? Just let it run until cancelled by navigating away
             var gameInstallDir = await monitor.WaitForInstallationAsync(_appId, monitorCts.Token);
 
             if (string.IsNullOrEmpty(gameInstallDir))
@@ -972,18 +1097,13 @@ public sealed partial class GameDetailsPage : Page
                 return;
             }
 
-            SetInstallProgressIndeterminate("Fetching matching online fix...");
-
-            // 3. Find matching online fix
-            var fixes = await TypedApp.Svcs.GameGenApi.GetOnlineFixesAsync(apiKey, CancellationToken.None);
-            
-            // Clean up name for matching (e.g. remove non-alphanumeric)
-            var searchName = new string(_displayName.Where(char.IsLetterOrDigit).ToArray());
-            
-            var targetFix = fixes.FirstOrDefault(f => 
-                new string(f.Title.Where(char.IsLetterOrDigit).ToArray()).Contains(searchName, StringComparison.OrdinalIgnoreCase) ||
-                new string(f.Name.Where(char.IsLetterOrDigit).ToArray()).Contains(searchName, StringComparison.OrdinalIgnoreCase)
-            );
+            var targetFix = _availableFix;
+            if (targetFix == null)
+            {
+                SetInstallProgressIndeterminate("Fetching matching online fix...");
+                var fixes = await TypedApp.Svcs.GameGenApi.GetOnlineFixesAsync(apiKey, CancellationToken.None);
+                targetFix = OnlineFixMatcher.FindMatch(fixes, _displayName);
+            }
 
             if (targetFix == null)
             {
@@ -992,70 +1112,7 @@ public sealed partial class GameDetailsPage : Page
             }
 
             SetInstallProgressIndeterminate($"Downloading fix: {targetFix.Title}...");
-
-            // 4. Download and extract fix
-            var downloadProgress = new Progress<double>(pct =>
-            {
-                if (InstallProgressRing.Visibility == Visibility.Visible)
-                {
-                    InstallProgressRing.IsActive   = false;
-                    InstallProgressRing.Visibility = Visibility.Collapsed;
-                    InstallProgressBar.Visibility  = Visibility.Visible;
-                }
-                InstallProgressBar.Value = pct;
-                InstallProgressText.Text = $"Downloading Fix… {pct:0}%";
-            });
-
-            using var ms = new MemoryStream();
-            await TypedApp.Svcs.GameGenApi.DownloadOnlineFixAsync(apiKey, targetFix.Name, ms, CancellationToken.None, downloadProgress);
-            ms.Position = 0;
-
-            SetInstallProgressIndeterminate("Extracting online fix to game folder...");
-
-            // Extract the archive (supports .zip and .rar) to gameInstallDir
-            using var archive = SharpCompress.Archives.ArchiveFactory.OpenArchive(ms);
-            
-            // 1. Analyze entries to find common root folder
-            var allFileKeys = archive.Entries.Where(e => !e.IsDirectory && !string.IsNullOrEmpty(e.Key)).Select(e => e.Key.Replace('\\', '/')).ToList();
-            string? commonRoot = null;
-            if (allFileKeys.Count > 0)
-            {
-                var firstKeyParts = allFileKeys[0].Split('/');
-                if (firstKeyParts.Length > 1)
-                {
-                    var potentialRoot = firstKeyParts[0] + "/";
-                    if (allFileKeys.All(k => k.StartsWith(potentialRoot)))
-                    {
-                        commonRoot = potentialRoot;
-                    }
-                }
-            }
-
-            foreach (var entry in archive.Entries)
-            {
-                if (entry.IsDirectory || string.IsNullOrEmpty(entry.Key)) continue;
-
-                var entryKey = entry.Key.Replace('\\', '/');
-                if (commonRoot != null && entryKey.StartsWith(commonRoot))
-                {
-                    entryKey = entryKey.Substring(commonRoot.Length);
-                }
-                
-                if (string.IsNullOrEmpty(entryKey)) continue;
-
-                var targetPath = System.IO.Path.Combine(gameInstallDir, entryKey.Replace('/', System.IO.Path.DirectorySeparatorChar));
-                var targetDir = System.IO.Path.GetDirectoryName(targetPath);
-                if (!string.IsNullOrEmpty(targetDir) && !System.IO.Directory.Exists(targetDir))
-                {
-                    System.IO.Directory.CreateDirectory(targetDir);
-                }
-
-                entry.WriteToFile(targetPath, new SharpCompress.Common.ExtractionOptions()
-                {
-                    Overwrite = true
-                });
-            }
-
+            await DownloadAndApplyFixAsync(apiKey, targetFix, gameInstallDir).ConfigureAwait(true);
             Status($"Successfully installed {_displayName} and its online fix!", InfoBarSeverity.Success);
         }
         catch (Exception ex)
@@ -1072,10 +1129,24 @@ public sealed partial class GameDetailsPage : Page
 
     private async void Install_Click(object sender, RoutedEventArgs e)
     {
-        if (_isConfigured) return;
+        if (_isConfigured || _installInProgress) return;
+        _installInProgress = true;
 
-        if (!await RunSetupGuideAsync()) return;
-        if (!await EnsureSteamToolsOrContinueAnywayAsync()) return;
+        // These two await calls each show a ContentDialog. They go through DialogService, which
+        // refuses to open a second dialog (or one on a detached XamlRoot) — the WinUI overlap that
+        // fail-fasts the whole process (0xc000027b) and can't be caught. The try/catch stays as a
+        // secondary net for ordinary exceptions.
+        try
+        {
+            if (!await RunSetupGuideAsync()) { _installInProgress = false; return; }
+            if (!await EnsureSteamToolsOrContinueAnywayAsync()) { _installInProgress = false; return; }
+        }
+        catch (Exception ex)
+        {
+            Status($"Couldn't start install: {ex.Message}", InfoBarSeverity.Error);
+            _installInProgress = false;
+            return;
+        }
 
         InstallButton.IsEnabled = false;
         SetInstallProgressIndeterminate("Fetching from GameGen…");
@@ -1179,6 +1250,7 @@ public sealed partial class GameDetailsPage : Page
         }
         finally
         {
+            _installInProgress = false;
             HideInstallProgress();
             UpdateActionButtons();
             TypedApp.Svcs.DiscordPresence.NotifyBrowsingGame(TruncateForDiscord(_displayName));
@@ -1329,7 +1401,7 @@ public sealed partial class GameDetailsPage : Page
             DefaultButton       = ContentDialogButton.Primary,
             XamlRoot            = XamlRoot!,
         };
-        return await dlg.ShowAsync() == ContentDialogResult.Secondary;
+        return await DialogService.ShowAsync(dlg) == ContentDialogResult.Secondary;
     }
 
     private async Task<(bool IsExhausted, GameGenStatsResult? Stats)> CheckQuotaAsync(string errorMessage)
@@ -1417,7 +1489,7 @@ public sealed partial class GameDetailsPage : Page
             },
         };
 
-        await dlg.ShowAsync();
+        await DialogService.ShowAsync(dlg);
         if (TypedApp.MainShell is MainWindow mw)
             await mw.RefreshUserStatsAsync().ConfigureAwait(true);
     }
@@ -1456,7 +1528,7 @@ public sealed partial class GameDetailsPage : Page
             XamlRoot          = XamlRoot!,
         };
 
-        var choice = await dlg.ShowAsync();
+        var choice = await DialogService.ShowAsync(dlg);
         if (choice == ContentDialogResult.Primary &&
             TypedApp.MainShell is MainWindow mw)
         {
@@ -1718,7 +1790,7 @@ public sealed partial class GameDetailsPage : Page
             RefreshDialog();
         };
 
-        await dlg.ShowAsync();
+        await DialogService.ShowAsync(dlg);
         return done;
     }
 }

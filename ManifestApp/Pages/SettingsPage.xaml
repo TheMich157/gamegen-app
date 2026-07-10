@@ -110,14 +110,14 @@
                     <StackPanel Spacing="4">
                         <ToggleSwitch
                             x:Name="AutoInstallOnlineFixToggle"
-                            Header="Auto-install Steam game and online fix"
-                            OffContent="Manual"
+                            Header="Auto-install Steam game and online fix after manifest install"
+                            OffContent="Manual (default)"
                             OnContent="Automatic"
                             Toggled="AutoInstallOnlineFixToggle_Toggled" />
                         <TextBlock
                             FontSize="12"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Text="Automatically triggers the Steam download after generating a manifest, waits for it to finish, and installs the matching online fix zip directly into the game folder."
+                            Text="Off by default. Use the Fix available button on a game page to download and apply an online fix manually. When enabled here, manifest install also triggers Steam download and auto-applies a matching fix."
                             TextWrapping="WrapWholeWords" />
                     </StackPanel>
                 </StackPanel>

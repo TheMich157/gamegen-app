@@ -152,15 +152,24 @@
                 </InfoBar.ActionButton>
             </InfoBar>
 
-            <!-- Startup splash; sits on top of NavigationView and OnboardingHost until init completes. -->
-            <Grid x:Name="SplashHost" IsHitTestVisible="True">
-                <pages:SplashOverlay x:Name="Splash" />
-            </Grid>
-
             <!-- Admin lockout overlay -->
             <Grid x:Name="LockoutHost" Visibility="Collapsed" IsHitTestVisible="True" Canvas.ZIndex="999">
                 <pages:LockoutOverlay />
             </Grid>
+        </Grid>
+
+        <!-- Startup splash; spans the title bar and content area so the animation is centered in the full window. -->
+        <Grid
+            x:Name="SplashHost"
+            Grid.RowSpan="2"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Stretch"
+            Canvas.ZIndex="900"
+            IsHitTestVisible="True">
+            <pages:SplashOverlay
+                x:Name="Splash"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch" />
         </Grid>
     </Grid>
 </Window>

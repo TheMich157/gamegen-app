@@ -30,13 +30,24 @@ public partial class App : Application
             "MICROSOFT_WINDOWSAPPRUNTIME_BASE_DIRECTORY",
             AppContext.BaseDirectory);
 
-        // TEMP: diagnostic logging for XAML/runtime crashes
+        // Diagnostic logging for XAML/runtime crashes. Critically, e.Handled must be set to true
+        // on the App.UnhandledException event — otherwise WinUI logs the exception and then still
+        // terminates the process, which was causing "involuntary" crashes (e.g. clicking Install)
+        // for exceptions that should have just surfaced as an error message instead.
         AppDomain.CurrentDomain.UnhandledException += (_, e) => LogCrash("AppDomain", e.ExceptionObject as Exception);
-        TaskScheduler.UnobservedTaskException += (_, e) => LogCrash("TaskScheduler", e.Exception);
+        TaskScheduler.UnobservedTaskException += (_, e) =>
+        {
+            LogCrash("TaskScheduler", e.Exception);
+            e.SetObserved();
+        };
 
         InitializeComponent();
 
-        UnhandledException += (_, e) => LogCrash("App", e.Exception);
+        UnhandledException += (_, e) =>
+        {
+            LogCrash("App", e.Exception);
+            e.Handled = true;
+        };
 
         // Enforce single instance via named system Mutex
         AppLogger.Log($"Application starting up. CommandLine: {Environment.CommandLine}");

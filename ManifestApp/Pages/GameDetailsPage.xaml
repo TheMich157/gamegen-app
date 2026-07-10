@@ -139,6 +139,15 @@
                                         <TextBlock Text="Remove files" />
                                     </StackPanel>
                                 </Button>
+                                <Button x:Name="FixAvailableButton"
+                                        MinHeight="40" MinWidth="150"
+                                        Visibility="Collapsed"
+                                        Click="FixAvailable_Click">
+                                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                        <FontIcon Glyph="&#xE895;" FontSize="14" />
+                                        <TextBlock Text="Fix available" FontWeight="SemiBold" />
+                                    </StackPanel>
+                                </Button>
                                 <Button x:Name="LaunchSteamButton"
                                         MinHeight="40" MinWidth="150"
                                         Click="LaunchSteam_Click">

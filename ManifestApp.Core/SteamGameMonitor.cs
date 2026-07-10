@@ -54,6 +54,33 @@ public sealed class SteamGameMonitor(SettingsStore settingsStore)
         return null;
     }
 
+    /// <summary>
+    /// Returns the install directory when the game is already fully installed, without waiting.
+    /// </summary>
+    public string? TryGetInstalledGamePath(uint appId)
+    {
+        var resolver = new SteamPathsResolver(settingsStore);
+        var steamRoot = resolver.ResolveSteamInstall();
+        if (string.IsNullOrEmpty(steamRoot)) return null;
+
+        foreach (var dir in CollectSteamAppsDirectories(steamRoot))
+        {
+            if (!Directory.Exists(dir)) continue;
+
+            var acfPath = Path.Combine(dir, $"appmanifest_{appId}.acf");
+            if (!File.Exists(acfPath)) continue;
+
+            if (!TryParseAppManifest(acfPath, out var stateFlags, out var installDir)) continue;
+            if (stateFlags != 4 || string.IsNullOrWhiteSpace(installDir)) continue;
+
+            var gamePath = Path.Combine(dir, "common", installDir);
+            if (Directory.Exists(gamePath))
+                return gamePath;
+        }
+
+        return null;
+    }
+
     private static List<string> CollectSteamAppsDirectories(string steamInstall)
     {
         var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
